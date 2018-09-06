@@ -27,18 +27,34 @@ gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
 laplac = cv2.Laplacian( gray, cv2.CV_64F)
 edges = cv2.Canny( gray, 100, 200)
 
+blobDetect = cv2.SimpleBlobDetector_create()
+keypoints = blobDetect.detect(gray)
+im_with_keypoints = cv2.drawKeypoints(gray, keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+## Image Filter
+##img_filt = cv2.medianBlur(gray, 5)
+##img_th = cv2.adaptiveThreshold( img_filt, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+##contours, hierarchy, _ = cv2.findContours(img_th, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 ret, thresh = cv2.threshold(gray, 127,255,0)
-image, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+contours, hierarchy, _ = cv2.findContours(thresh,1,2)
 
 ## Draw Countour
-cont = cv2.drawContours(img, contours, -1, (0,255,0), 3)
+cnt = contours[0]
+x,y,w,h = cv2.boundingRect(cnt)
+img = cv2.rectangle( gray, (x,y), (x+w,y+h), (0,255,0), 2)
+
+rect = cv2.minAreaRect(cnt)
+box = cv2.boxPoints(rect)
+box = np.int0(box)
+img = cv2.drawContours(img, [box], 0, (0, 255, 0), 2)
+##img = cv2.drawContours(img, cnt, 0, (0,255,0), 3)
 
 ## Show Image
 cv2.imshow( 'Original Image', img)
 ##cv2.imshow( 'Laplacian', laplac)
 cv2.imshow( 'Canny', edges)
-cv2.imshow( 'Contour', cont)
+cv2.imshow( 'Keypoints', im_with_keypoints)
 
 ## Destroy Windows
 cv2.waitKey(0)
