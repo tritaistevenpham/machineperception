@@ -19,21 +19,65 @@ while option != 1 and option != 2:
         print('Please only use integers')
 
 if option == 1:
-    fileLoc = './20180826a/SetA/label-7-radioactive-ii.png'
+    fileLoc = './P1380502.JPG'
 elif option == 2:
-    fileLoc = './20180826a/SetA/'
+    fileLoc = './20180826a/SetA/label-7-radioactive-ii.png'
 
-## Option 1
-img = cv2.imread( fileLoc, cv2.IMREAD_COLOR)
+## Option 1 + resize
+img_orig = cv2.imread( fileLoc, cv2.IMREAD_COLOR)
+
+r = 500.0 / img_orig.shape[1]
+dim =  (500,  int( img_orig.shape[0] * r))
+
+img = cv2.resize( img_orig, dim, interpolation = cv2.INTER_AREA)
 
 ## Option 2
 ## img = cv2.imread( dirLoc, cv2.IMREAD_COLOR)
 
 ## Color conversion - grayscale for image processing
-gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
+gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
 
-## Show Image
+### SHAPE DETECTION
+## Goal: Contour the diamond-shaped hazmat sign to be the main processing space.
+
+##      Apply Gaussian blur with a 5 x 5 kernel to the image (Reduce high frequency noise)
+gblur = cv2.GaussianBlur( gray_img, (5, 5), 0)
+
+##      Compute the edge map
+edge = cv2.Canny( gblur, 50, 200, 255)
+
+##      Find the contours within the computed edge map; sort by size in desc order
+contours = cv2.findContours( edge.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cnt = contours[1]
+cnt = sorted(cnt, key=cv2.contourArea, reverse=True)
+displayCnt = None
+
+##      Loop over the contours
+aprx = None
+for c in cnt:
+    ## Approximate the contour
+    al =  cv2.arcLength( c, True)
+    aprx = cv2.approxPolyDP( c, 0.02 * al, True)
+    print('Approx coordinates: ', aprx)
+    ## If the contour has 4 vertices, we have found "a" diamond shape.
+    if len( aprx) == 4:
+        displayCnt = aprx
+        print('found 4 vertices')
+        break
+
+##      Draw detected "corners"
+cv2.drawContours( img, aprx, -1, (0,255,0), 3)
+
+##      Finding the four vertices means we can extract the contents
+##      Extract the sign, and apply a PERSPECTIVE transform
+pts1 = np.float32( [[aprx[0]], [aprx[1]], [aprx[2]], [aprx[3]]])
+pts2 = np.float32( [[250,0], [0,250], [250,500], [500, 250]])
+
+### SHAPE DETECTION FINISH
+
+## Show Images
 cv2.imshow( 'Original Image', img)
+cv2.imshow( 'Edge Map', edge)
 
 ## Destroy Windows
 cv2.waitKey(0)
