@@ -19,7 +19,7 @@ while option != 1 and option != 2:
         print('Please only use integers')
 
 if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG 
-    fileLoc = './P1380513.JPG'
+    fileLoc = './P1380502.JPG'
 elif option == 2:
     fileLoc = './20180826a/SetA/label-7-radioactive-ii.png'
 
@@ -44,7 +44,8 @@ gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
 gblur = cv2.GaussianBlur( gray_img, (5, 5), 0)
 
 ##      Compute the edge map
-edge = cv2.Canny( gblur, 50, 200, 255)
+edge = cv2.Canny( gblur, 100, 255, 255)
+#edge = cv2.Laplacian( gblur, cv2.CV_8UC1)
 
 ##      Find the contours within the computed edge map; sort by size in desc order
 contours = cv2.findContours( edge.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -102,6 +103,7 @@ print('num_signs: ', num_signs)
 ##      Finding the four vertices means we can extract the contents
 ##      Extract the sign, and apply a PERSPECTIVE transform
 ##      So, for each sign in sign_arr; extract details.
+M = None
 
 for s in range(len(sign_arr)):
     pts1 = np.float32( [[ sign_arr[s][0][0], sign_arr[s][0][1]], 
@@ -109,7 +111,15 @@ for s in range(len(sign_arr)):
                         [ sign_arr[s][2][0], sign_arr[s][2][1]], 
                         [ sign_arr[s][3][0], sign_arr[s][3][1]]])
     
-    pts2 = np.float32( [[250,0], [0,250], [250,500], [500, 250]])
+    pts2 = np.float32( [[0,0], [500,0], [0,500], [500, 500]])
+    
+    # Call the perspective transform function
+    T = cv2.getPerspectiveTransform( pts1, pts2)
+    
+    # Warp perspective 
+    warped = cv2.warpPerspective( img, T, (500, 500))
+    
+    cv2.imshow( 'Perspective Transform', warped)
 
 ### SHAPE DETECTION FINISH
 
