@@ -18,7 +18,7 @@ while option != 1 and option != 2:
     except ValueError:
         print('Please only use integers')
 
-if option == 1: ##P1380513.JPG | P1380502.JPG
+if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG 
     fileLoc = './P1380513.JPG'
 elif option == 2:
     fileLoc = './20180826a/SetA/label-7-radioactive-ii.png'
@@ -54,6 +54,9 @@ displayCnt = None
 
 ##      Loop over the contours
 aprx = None
+sign_arr = []
+sign_count = 0
+running_count = 0
 for c in cnt:
     ## Approximate the contour
     al =  cv2.arcLength( c, True)
@@ -62,13 +65,22 @@ for c in cnt:
     # Use bounding rectangle on the approximated points:
     rect = cv2.boundingRect( aprx)
     x, y, w, h = rect
+    
+    # Draw the rectangle on the set of 4 approximated values
     cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
+    
     print('Approx coordinates: ', aprx)
     div_four = len( aprx)
+    
+    # Draw the approximated contour for each corner 
     if div_four % 4 == 0:
-        ##      Draw detected "corners"
         cv2.drawContours( img, aprx, -1, (0,255,0), 5)
+        running_count = running_count + div_four
+        
+        # Append to an array of signs to store
+        sign_arr.append(aprx)
     else:
+        # If approximation doesn't apply; sign obscured so not 100% certain
         break
     
     ## If the contour has 4 vertices, we have found "a" diamond shape.
@@ -77,8 +89,11 @@ for c in cnt:
     ##    print('found ', div_four, ' vertices')
     ##    break
 
-##      Draw detected "corners"
-##cv2.drawContours( img, aprx, -1, (0,255,0), 5)
+print('running_count: ', running_count)
+num_signs = float(running_count) / 4.0
+print('num_signs: ', num_signs)
+
+print('Sign 1: ', sign_arr[0])
 
 ##      Finding the four vertices means we can extract the contents
 ##      Extract the sign, and apply a PERSPECTIVE transform
