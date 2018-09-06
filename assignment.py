@@ -26,8 +26,8 @@ elif option == 2:
 ## Option 1 + resize
 img_orig = cv2.imread( fileLoc, cv2.IMREAD_COLOR)
 
-r = 500.0 / img_orig.shape[1]
-dim =  (500,  int( img_orig.shape[0] * r))
+r = 600.0 / img_orig.shape[1]
+dim =  (600,  int( img_orig.shape[0] * r))
 
 img = cv2.resize( img_orig, dim, interpolation = cv2.INTER_AREA)
 
@@ -55,7 +55,7 @@ displayCnt = None
 ##      Loop over the contours
 aprx = None
 sign_arr = []
-sign_count = 0
+rect_coords = []
 running_count = 0
 for c in cnt:
     ## Approximate the contour
@@ -77,8 +77,13 @@ for c in cnt:
         cv2.drawContours( img, aprx, -1, (0,255,0), 5)
         running_count = running_count + div_four
         
-        # Append to an array of signs to store
-        sign_arr.append(aprx)
+        # Append rect coords to an array of signs to store
+        rect_coords = []
+        rect_coords.append([x,y])
+        rect_coords.append([x+w, y])
+        rect_coords.append([x, y+h])
+        rect_coords.append([x+w, y+w])
+        sign_arr.append(rect_coords)
     else:
         # If approximation doesn't apply; sign obscured so not 100% certain
         break
@@ -93,12 +98,20 @@ print('running_count: ', running_count)
 num_signs = float(running_count) / 4.0
 print('num_signs: ', num_signs)
 
-print('Sign 1: ', sign_arr[0])
 
 ##      Finding the four vertices means we can extract the contents
 ##      Extract the sign, and apply a PERSPECTIVE transform
-pts1 = np.float32( [[aprx[0]], [aprx[1]], [aprx[2]], [aprx[3]]])
-pts2 = np.float32( [[250,0], [0,250], [250,500], [500, 250]])
+##      So, for each sign in sign_arr; extract details.
+
+for s in range(len(sign_arr)):
+    print('s: ', s)
+    print('sign_arr: ', sign_arr[0][0][0])
+    pts1 = np.float32( [[ sign_arr[s][0][0], sign_arr[s][0][1]], 
+                        [ sign_arr[s][1][0], sign_arr[s][1][1]], 
+                        [ sign_arr[s][2][0], sign_arr[s][2][1]], 
+                        [ sign_arr[s][3][0], sign_arr[s][3][1]]])
+    
+    pts2 = np.float32( [[250,0], [0,250], [250,500], [500, 250]])
 
 ### SHAPE DETECTION FINISH
 
