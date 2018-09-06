@@ -27,6 +27,8 @@ gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
 laplac = cv2.Laplacian( gray, cv2.CV_64F)
 edges = cv2.Canny( gray, 100, 200)
 
+##test commit
+
 blobDetect = cv2.SimpleBlobDetector_create()
 keypoints = blobDetect.detect(gray)
 im_with_keypoints = cv2.drawKeypoints(gray, keypoints, np.array([]), (0,0,255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
