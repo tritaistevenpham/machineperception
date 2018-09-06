@@ -58,6 +58,11 @@ for c in cnt:
     ## Approximate the contour
     al =  cv2.arcLength( c, True)
     aprx = cv2.approxPolyDP( c, 0.02 * al, True)
+    
+    # Use bounding rectangle on the approximated points:
+    rect = cv2.boundingRect( aprx)
+    x, y, w, h = rect
+    cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
     print('Approx coordinates: ', aprx)
     ## If the contour has 4 vertices, we have found "a" diamond shape.
     if len( aprx) == 4:
@@ -66,7 +71,7 @@ for c in cnt:
         break
 
 ##      Draw detected "corners"
-cv2.drawContours( img, aprx, -1, (0,255,0), 3)
+cv2.drawContours( img, aprx, -1, (0,255,0), 5)
 
 ##      Finding the four vertices means we can extract the contents
 ##      Extract the sign, and apply a PERSPECTIVE transform
