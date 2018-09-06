@@ -18,8 +18,8 @@ while option != 1 and option != 2:
     except ValueError:
         print('Please only use integers')
 
-if option == 1:
-    fileLoc = './P1380502.JPG'
+if option == 1: ##P1380513.JPG | P1380502.JPG
+    fileLoc = './P1380513.JPG'
 elif option == 2:
     fileLoc = './20180826a/SetA/label-7-radioactive-ii.png'
 
@@ -64,14 +64,21 @@ for c in cnt:
     x, y, w, h = rect
     cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
     print('Approx coordinates: ', aprx)
-    ## If the contour has 4 vertices, we have found "a" diamond shape.
-    if len( aprx) == 4:
-        displayCnt = aprx
-        print('found 4 vertices')
+    div_four = len( aprx)
+    if div_four % 4 == 0:
+        ##      Draw detected "corners"
+        cv2.drawContours( img, aprx, -1, (0,255,0), 5)
+    else:
         break
+    
+    ## If the contour has 4 vertices, we have found "a" diamond shape.
+    ##if len( aprx) == 4:
+    ##    displayCnt = aprx
+    ##    print('found ', div_four, ' vertices')
+    ##    break
 
 ##      Draw detected "corners"
-cv2.drawContours( img, aprx, -1, (0,255,0), 5)
+##cv2.drawContours( img, aprx, -1, (0,255,0), 5)
 
 ##      Finding the four vertices means we can extract the contents
 ##      Extract the sign, and apply a PERSPECTIVE transform
