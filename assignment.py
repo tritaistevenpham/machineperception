@@ -61,19 +61,19 @@ for c in cnt:
     ## Approximate the contour
     al =  cv2.arcLength( c, True)
     aprx = cv2.approxPolyDP( c, 0.02 * al, True)
-    
-    # Use bounding rectangle on the approximated points:
-    rect = cv2.boundingRect( aprx)
-    x, y, w, h = rect
-    
-    # Draw the rectangle on the set of 4 approximated values
-    cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
-    
-    print('Approx coordinates: ', aprx)
+
     div_four = len( aprx)
     
     # Draw the approximated contour for each corner 
     if div_four % 4 == 0:
+        print('Approx coordinates: ', aprx)
+        # Use bounding rectangle on the approximated points:
+        rect = cv2.boundingRect( aprx)
+        x, y, w, h = rect
+        
+        # Draw the rectangle on the set of 4 approximated values
+        cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
+        
         cv2.drawContours( img, aprx, -1, (0,255,0), 5)
         running_count = running_count + div_four
         
@@ -94,7 +94,7 @@ for c in cnt:
     ##    print('found ', div_four, ' vertices')
     ##    break
 
-print('running_count: ', running_count)
+print('# Of Detected Vertices (of Signs): ', running_count)
 num_signs = float(running_count) / 4.0
 print('num_signs: ', num_signs)
 
@@ -104,8 +104,6 @@ print('num_signs: ', num_signs)
 ##      So, for each sign in sign_arr; extract details.
 
 for s in range(len(sign_arr)):
-    print('s: ', s)
-    print('sign_arr: ', sign_arr[0][0][0])
     pts1 = np.float32( [[ sign_arr[s][0][0], sign_arr[s][0][1]], 
                         [ sign_arr[s][1][0], sign_arr[s][1][1]], 
                         [ sign_arr[s][2][0], sign_arr[s][2][1]], 
