@@ -30,10 +30,10 @@ png = '.png'
 jpg = '.JPG'
 
 #Output directories
-contourA = 'results/contourA/img-'
-contourB = 'results/contourB/img-'
-contourC = 'results/contourC/img-'
-contourD = 'results/contourD/img-'
+contourA = 'results/contourA/'
+contourB = 'results/contourB/'
+contourC = 'results/contourC/'
+contourD = 'results/contourD/'
 
 # Re-size to 900x with AR maximums
 maxWidth = 900
@@ -41,7 +41,7 @@ maxHeight = 900
 
 ### START-GET POINTS FUNCTION
 
-def getPoints( img):
+#def getPoints( img):
     
 
 ### END-GET POINTS FUNCTION
@@ -81,10 +81,10 @@ def fourPtTrans( img, points):
     ## Specify destination points (top-left, top-right, bottom-right, bottom-left)
     ## Into diamond (TL = top, TR = right, BR = bottom, BL = left)
     dest = np.array( [ 
-        [ imgWidth / 2.0, 0],
-        [ imgWidth, imgHeight / 2.0],
-        [ imgWidth, imgHeight],
-        [ 0, imgHeight], dtype = "float32")
+        [ (imgWidth / 2.0), 0], 
+        [ imgWidth, (imgHeight / 2.0)], 
+        [ imgWidth, imgHeight], 
+        [0, imgHeight]], dtype = "float32")
     
     ## Compute the transformation matrix and apply
     T = cv2.getPerspectiveTransform( rect, dest)
@@ -156,10 +156,10 @@ def preprocessImage( img):
         # If the contour detected has 4 vertices; likely to be our sign:
         if ( len( aprx) == 4) and cv2.contourArea( aprx) > float( 4000.0):
             sign = aprx
-            extrLeft = tuple( aprx[ aprx[ :,:,0].np.argmin()][0])
-            extrRight = tuple( aprx[ aprx[ :,:,0].np.argmin()][0])
-            extrTop = tuple( aprx[ aprx[ :,:,1].np.argmin()][0])
-            extrBot = tuple( aprx[ aprx[ :,:,1].np.argmin()][0])
+            extrLeft = tuple( c[ c[ :,:,0].argmin()][0])
+            extrRight = tuple( c[ c[ :,:,0].argmin()][0])
+            extrTop = tuple( c[ c[ :,:,1].argmin()][0])
+            extrBot = tuple( c[ c[ :,:,1].argmin()][0])
             points = np.zeros( ( 4, 2), dtype = "float32")
             
         # Draw the signs contour onto the mask and fill
@@ -188,9 +188,9 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     
     ## Minus out the noise to black and show the sign
     res = cv2.bitwise_and( img, mask)
-    
+    cv2.imshow( 'res', res)
     ## Perform perspective transform on the mask for expected working space
-    points = getPoints( res)
+    #points = getPoints( res)
     
     
 elif option == 2:
@@ -199,15 +199,20 @@ elif option == 2:
     
     ## Store the images inside an array for processing
     data = []
+    filename = []
     for files in images:
         img_orig = cv2.imread( files, cv2.IMREAD_COLOR)
         
+        head, fn = os.path.split( files)
+        #print( fn)
+        
         img = resizeFunc( img_orig)
+        filename.append( fn)
         data.append( img)
         
     ## Option 2: Read all image files
     idx = 0
-    for im in data:
+    for im, fn in zip( data, filename):
         try:
             ## Pre-process original images to get mask of the hazmat labels
             mask = preprocessImage( im)
@@ -216,15 +221,17 @@ elif option == 2:
             ## Process the mask for expected results
             
             ## Change contour output location & image type here
-            print( outputImages + contourB + str(idx) + jpg)
+            #print( outputImages + contourB + str(idx) + jpg)
+            print( outputImages + contourB + fn)
             
-            cv2.imwrite( ( outputImages + contourB + str(idx) + jpg), res)
-            idx += 1
+            cv2.imwrite( ( outputImages + contourB + fn), res)
+            #cv2.imwrite( ( outputImages + contourB + str(idx) + jpg), res)
+            #idx += 1
         except Exception as e:
             print(e)
             
-    cv2.waitKey(0)
-    cv2.destroyAllWindows
+cv2.waitKey(0)
+cv2.destroyAllWindows
 
 ### END-MAIN
 
