@@ -4,60 +4,78 @@
 ## Year: 2018
 
 ## Import libraries
+from SignDetector import SignDetector
+import pytesseract as pt
 import cv2
 import numpy as np
 import glob
 import os
 
-## Main
+## Global declarations
 fileLoc = ''
 fileName = ''
 option = 0
+outputImages = 'IMAGES/'
 outputDir = 'Output/'
-## Choose: 1 - Read a single file from SetA
-##         2 - Read all images from a directory
+
+### START-MASK DETECTION
 
 def preprocessImage(img):
+    
+    img_eq = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE( clipLimit=4.0, tileGridSize=( 8, 8))
+    cl1 = clahe.apply( img_eq)
+    
     ## Color conversion - grayscale for image processing
+    #gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
     
-
-    ### OBJECT DETECTION
-    ## Goal: Contour the diamond-shaped hazmat sign to be the main processing space.
-
-    ##      Apply Gaussian blur with a 5 x 5 kernel to the image (Reduce high frequency noise)
+    ## Goal: Contour the diamond-shaped hazmat sign to be the main processing space.    
+    ## Apply Gaussian Blur and add this weight to the grayscale image
+    gray_img = cv2.GaussianBlur( cl1, (3,3), 1)
+    #gray_img = cv2.addWeighted( gblur, 1.5, gray_img, -0.5, 0, gray_img)
     
     
-    ##      Apply Bilateral Filter on grayscale image
-    gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
-    bfilt = cv2.bilateralFilter( gray_img, 5, 85, 75)
-    
+    ##      Apply Bilateral Filter on grayscale image & run Canny edge detector
+    bfilt = cv2.bilateralFilter( gray_img, 5, 75, 75)
     thresh = cv2.Canny( bfilt, 255/3, 255)
+    thresh = cv2.dilate( thresh, np.ones((5,5), np.uint8), iterations=1)
     
-    #edge = cv2.Laplacian( gblur, cv2.CV_8UC1)
-
     ##      Find the contours within the computed edge map; sort by size in desc order
     contours = cv2.findContours( thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnt = contours[1]
     cnt = sorted(cnt, key=cv2.contourArea, reverse=True)
-    displayCnt = None
-
-    ##      Loop over the contours
-    aprx = None
-    sign_arr = []
-    rect_coords = []
-    running_count = 0
-            
+    
+    # cont -> for Bounding Rect
     cont = max( cnt, key=cv2.contourArea)
-    #cv2.drawContours( img, cont, -1, (255,255,0), 8)
-    cv2.drawContours( img, cnt, 0, (0,0,255), 5)
     
-    x, y, w, h = cv2.boundingRect( cont)
-    cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
+    # Initialise signDetect
+    signDetect = SignDetector()
     
-    ### END OBJECT DETECTION
+    for c in cnt:
+        sign = signDetect.findSign( c)
+        if( sign == True):
+            # Draw the sign contour
+            cv2.drawContours( img, [c], -1, (0, 255, 0), 2)
+        
+        #cv2.drawContours( img, [aprx], 0, (0, 0, 255), 4)
+        
+    ## Draw mask
+    mask = np.zeros( img.shape, np.uint8)
+    cv2.drawContours( mask, cnt, 0, (255,255,255), 3)
+    
+    ## Draw contours on img
+    #cv2.drawContours( img, aprx, -1, (0,0,255), 5)
+    
+    ##      Draw the bounding box for testing 
+    #x, y, w, h = cv2.boundingRect( cont)
+    #cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
 
-    return img
+    return mask
 
+### END-MASK DETECTION
+
+### START-MAIN
+    
 while option != 1 and option != 2:
     try: option = int(raw_input( 'Enter either 1 or 2\n 1 - Read a single file\n 2 - Read all images from directory\n'))
     except ValueError:
@@ -75,35 +93,60 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG
     preprocessImage(img)
     
 elif option == 2:
-    fileLocA = './20180826a/SetA/*.png'
-    fileLocB = './20180826/SetB/*.JPG'
-    fileLocC = './20180826/SetC/*.JPG'
+    #Image directories
+    fileLocA = './IMAGES/SetA/*.png'
+    fileLocB = './IMAGES/SetB/*.JPG'
+    fileLocC = './IMAGES/SetC/*.JPG'
+    fileLocD = './IMAGES/SetD/*.JPG'
     
     png = '.png'
     jpg = '.JPG'
     
-    contourA = 'contourA/img-'
-    contourB = 'contourB/img-'
-    contourC = 'contourC/img-'
+    #Output directories
+    contourA = 'results/contourA/img-'
+    contourB = 'results/contourB/img-'
+    contourC = 'results/contourC/img-'
+    contourD = 'results/contourD/img-'
     
-    #validImgPath = os.path.join(fileLocB, '*.jpg')
-    images = glob.glob(fileLocC)
+    maxWidth = 500
+    maxHeight = 500
+    
+    
+    #For now, change this for file location
+    images = glob.glob(fileLocA)
     
     data = []
     for files in images:
-        img = cv2.imread(files, cv2.IMREAD_COLOR)
-        data.append(img)
+        img_orig = cv2.imread(files, cv2.IMREAD_COLOR)
+        
+        imgh, imgw = img_orig.shape[:2]
+        
+        if( maxHeight <= imgh or maxWidth <= imgw):
+            # Re-size for consistency across all images
+            r = maxHeight / float( imgh)
+            if( maxWidth / float( imgw) < r):
+                r = maxWidth / float( imgw)
+            
+            #dim =  (1000,  int( img_orig.shape[0] * r))
+            img = cv2.resize( img_orig, None, fx=r, fy=r, interpolation = cv2.INTER_AREA)
+            
+        data.append( img)
     
     ## Option 2
     idx = 0
     for im in data:
         try:
             result = preprocessImage(im)
-            print(outputDir + contourC + str(idx) + jpg)
-            cv2.imwrite( (outputDir + contourC + str(idx) + jpg), result)
+            #Change contour output location & image type here
+            print(outputImages + contourA + str(idx) + png)
+            
+            cv2.imwrite( (outputImages + contourA + str(idx) + png), result)
             idx += 1
         except Exception as e:
             print(e)
+            
+    cv2.waitKey(0)
+    cv2.destroyAllWindows
 
-
+### END-MAIN
 
