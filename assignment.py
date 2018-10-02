@@ -39,6 +39,13 @@ contourD = 'results/contourD/img-'
 maxWidth = 900
 maxHeight = 900
 
+### START-GET POINTS FUNCTION
+
+def getPoints( img):
+    
+
+### END-GET POINTS FUNCTION
+
 ### START-ORDER POINTS FUNCTION
 
 def orderPoints( points):
@@ -149,6 +156,11 @@ def preprocessImage( img):
         # If the contour detected has 4 vertices; likely to be our sign:
         if ( len( aprx) == 4) and cv2.contourArea( aprx) > float( 4000.0):
             sign = aprx
+            extrLeft = tuple( aprx[ aprx[ :,:,0].np.argmin()][0])
+            extrRight = tuple( aprx[ aprx[ :,:,0].np.argmin()][0])
+            extrTop = tuple( aprx[ aprx[ :,:,1].np.argmin()][0])
+            extrBot = tuple( aprx[ aprx[ :,:,1].np.argmin()][0])
+            points = np.zeros( ( 4, 2), dtype = "float32")
             
         # Draw the signs contour onto the mask and fill
         cv2.drawContours( mask, [sign], -1, ( 255, 255, 255), -1)
@@ -177,7 +189,9 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     ## Minus out the noise to black and show the sign
     res = cv2.bitwise_and( img, mask)
     
-    ## Process the mask for expected results
+    ## Perform perspective transform on the mask for expected working space
+    points = getPoints( res)
+    
     
 elif option == 2:
     ## For now, change this for file location
