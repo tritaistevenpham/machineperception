@@ -24,7 +24,7 @@ def preprocessImage(img):
     
     img_eq = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
     #Create
-    clahe = cv2.createCLAHE( clipLimit=3.5, tileGridSize=( 8, 8))
+    clahe = cv2.createCLAHE( clipLimit=3.0, tileGridSize=( 8, 8))
     cl = clahe.apply(img_eq)
     
     ## Color conversion - grayscale for image processing
@@ -38,16 +38,16 @@ def preprocessImage(img):
     #kernel = np.array( [ [0,-1,0], [-1,5,-1], [0,-1,0]])
     #dest = cv2.filter2D( gray_img, -1, kernel)
     
-    sharpen = cv2.addWeighted( img_eq, 0.8, blur, 0.2, 0)
+    sharpen = cv2.addWeighted( cl, 0.7, blur, 0.3, 0)
     
     
     ##      Apply Bilateral Filter on grayscale image & run Canny edge detector
     bfilt = cv2.bilateralFilter( sharpen, 5, 75, 75)
-    thresh = cv2.Canny( bfilt, 255/3, 200)
-    dilated = cv2.dilate( thresh, np.ones((3, 3), np.uint8), iterations=1)
+    thresh = cv2.Canny( bfilt, 280/3, 255)
+    #dilated = cv2.dilate( thresh, np.ones((3, 3), np.uint8), iterations=1)
     
     ##      Find the contours within the computed edge map; sort by size in desc order
-    contours = cv2.findContours( dilated.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = cv2.findContours( thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnt = contours[1]
     cnt = sorted(cnt, key=cv2.contourArea, reverse=True)
     
@@ -106,9 +106,12 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG
     
 elif option == 2:
     #Image directories
-    fileLocA = './IMAGES/SetA/*.png'
-    fileLocB = './IMAGES/SetB/*.JPG'
-    fileLocC = './IMAGES/SetC/*.JPG'
+    #fileLocA = './IMAGES/SetA/*.png'
+    fileLocA = './20180826a/SetA/*.png'
+    #fileLocB = './IMAGES/SetB/*.JPG'
+    fileLocB = './20180826/SetB/*.JPG'
+    #fileLocC = './IMAGES/SetC/*.JPG'
+    fileLocC = './20180826/SetC/*.JPG'
     fileLocD = './IMAGES/SetD/*.JPG'
     
     png = '.png'
@@ -125,7 +128,7 @@ elif option == 2:
     
     
     #For now, change this for file location
-    images = glob.glob(fileLocB)
+    images = glob.glob(fileLocC)
     
     data = []
     for files in images:
@@ -153,9 +156,9 @@ elif option == 2:
             res = cv2.bitwise_and( im, mask)
             
             #Change contour output location & image type here
-            print(outputImages + contourB + str(idx) + jpg)
+            print(outputImages + contourC + str(idx) + png)
             
-            cv2.imwrite( (outputImages + contourB + str(idx) + jpg), res)
+            cv2.imwrite( (outputImages + contourC + str(idx) + png), res)
             idx += 1
         except Exception as e:
             print(e)
