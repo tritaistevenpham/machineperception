@@ -54,16 +54,16 @@ def orderPoints( points):
     
     ## With this system, top left with have smallest sum of XY
     ## and bottom right will have the largest sum of XY
+    
     tot = points.sum( axis = 1)
-    rect[ 0] = pts[ np.argmin( s)]
-    rect[ 2] = pts[ np.argmax( s)]
+    rect[ 0] = points[ np.argmin( tot)]
+    rect[ 2] = points[ np.argmax( tot)]
     
     ## Top right will have the smallest difference between points
     ## Bottom left will have the largest difference between points
-    diff = points.diff( axis = 1)
-    rect[ 1] = pts[ np.argmin( diff)]
-    rect[ 3] = pts[ np.argmax( diff)]
-    
+    diff = np.diff( points, axis = 1)
+    rect[ 1] = points[ np.argmin( diff)]
+    rect[ 3] = points[ np.argmax( diff)]
     return rect;
     
 ### END-ORDER POINTS FUNCTION
@@ -72,19 +72,27 @@ def orderPoints( points):
 
 def fourPtTrans( img, points):
     ## Unpack the points and keep them consistent:
-    rect = orderPoints( points)
-    ( topLeft, topRight, botRight, botLeft) = rect
+    #rect = orderPoints( points)
+    rect = points #imported as [0] left, [1] right, [2] top, [3] bottom
+    ( left, right, top, bot) = rect
     
     ## Unpack the width and height of the img
     imgHeight, imgWidth = img.shape[ :2]
     
     ## Specify destination points (top-left, top-right, bottom-right, bottom-left)
     ## Into diamond (TL = top, TR = right, BR = bottom, BL = left)
-    dest = np.array( [ 
+    dest1 = np.array( [ 
         [ (imgWidth / 2.0), 0], 
         [ imgWidth, (imgHeight / 2.0)], 
         [ imgWidth, imgHeight], 
         [0, imgHeight]], dtype = "float32")
+    
+    ## Into diamond, ordering consistent as above
+    dest = np.array( [
+        [ 0, (imgHeight / 2.0)], #left
+        [ imgWidth, (imgHeight / 2.0)], #right
+        [ (imgWidth / 2.0), 0], #top
+        [ (imgWidth) / 2.0, imgHeight]], dtype = "float32") #bottom
     
     ## Compute the transformation matrix and apply
     T = cv2.getPerspectiveTransform( rect, dest)
@@ -149,6 +157,9 @@ def preprocessImage( img):
     ## Set up mask
     mask = np.zeros( img.shape, np.uint8)
     
+    ## Set up points to transform
+    points = np.zeros( ( 4, 2), dtype = "float32")
+    
     for c in cnt:
         perimeter = cv2.arcLength( c, True)
         aprx = cv2.approxPolyDP( c, 0.02 * perimeter, True)
@@ -156,16 +167,24 @@ def preprocessImage( img):
         # If the contour detected has 4 vertices; likely to be our sign:
         if ( len( aprx) == 4) and cv2.contourArea( aprx) > float( 4000.0):
             sign = aprx
-            extrLeft = tuple( c[ c[ :,:,0].argmin()][0])
-            extrRight = tuple( c[ c[ :,:,0].argmin()][0])
-            extrTop = tuple( c[ c[ :,:,1].argmin()][0])
-            extrBot = tuple( c[ c[ :,:,1].argmin()][0])
-            points = np.zeros( ( 4, 2), dtype = "float32")
+            ## Find the extreme corners of the detected sign and store them for P.T.
+            # Extreme left point
+            points[0] = tuple( c[ c[ :,:,0].argmin()][0])
+            # Extreme right point
+            points[1] = tuple( c[ c[ :,:,0].argmax()][0])
+            # Extreme top point
+            points[2] = tuple( c[ c[ :,:,1].argmin()][0])
+            # Extreme bot point
+            points[3] = tuple( c[ c[ :,:,1].argmax()][0])
             
         # Draw the signs contour onto the mask and fill
         cv2.drawContours( mask, [sign], -1, ( 255, 255, 255), -1)
+        ## Minus out the noise to black and show the sign
+        res = cv2.bitwise_and( img, mask)
+        
+        warp = fourPtTrans( res, points)
 
-    return mask
+    return warp
 
 ### END-MASK DETECTION
 
@@ -186,9 +205,7 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     img = resizeFunc( img_orig)
     mask = preprocessImage( img)
     
-    ## Minus out the noise to black and show the sign
-    res = cv2.bitwise_and( img, mask)
-    cv2.imshow( 'res', res)
+    cv2.imshow( 'res', mask)
     ## Perform perspective transform on the mask for expected working space
     #points = getPoints( res)
     
@@ -203,8 +220,8 @@ elif option == 2:
     for files in images:
         img_orig = cv2.imread( files, cv2.IMREAD_COLOR)
         
+        # Get fn for output details
         head, fn = os.path.split( files)
-        #print( fn)
         
         img = resizeFunc( img_orig)
         filename.append( fn)
@@ -216,7 +233,6 @@ elif option == 2:
         try:
             ## Pre-process original images to get mask of the hazmat labels
             mask = preprocessImage( im)
-            res = cv2.bitwise_and( im, mask)
             
             ## Process the mask for expected results
             
@@ -224,7 +240,7 @@ elif option == 2:
             #print( outputImages + contourB + str(idx) + jpg)
             print( outputImages + contourB + fn)
             
-            cv2.imwrite( ( outputImages + contourB + fn), res)
+            cv2.imwrite( ( outputImages + contourB + fn), mask)
             #cv2.imwrite( ( outputImages + contourB + str(idx) + jpg), res)
             #idx += 1
         except Exception as e:
