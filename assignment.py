@@ -24,7 +24,7 @@ def preprocessImage(img):
     
     img_eq = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
     #Create
-    clahe = cv2.createCLAHE( clipLimit=3.0, tileGridSize=( 8, 8))
+    clahe = cv2.createCLAHE( clipLimit=2.0, tileGridSize=( 8, 8))
     cl = clahe.apply(img_eq)
     
     ## Color conversion - grayscale for image processing
@@ -38,16 +38,16 @@ def preprocessImage(img):
     #kernel = np.array( [ [0,-1,0], [-1,5,-1], [0,-1,0]])
     #dest = cv2.filter2D( gray_img, -1, kernel)
     
-    sharpen = cv2.addWeighted( cl, 0.7, blur, 0.3, 0)
+    sharpen = cv2.addWeighted( cl, 0.8, blur, 0.2, 0)
     
     
     ##      Apply Bilateral Filter on grayscale image & run Canny edge detector
     bfilt = cv2.bilateralFilter( sharpen, 5, 75, 75)
-    thresh = cv2.Canny( bfilt, 280/3, 255)
-    #dilated = cv2.dilate( thresh, np.ones((3, 3), np.uint8), iterations=1)
+    thresh = cv2.Canny( bfilt, 255/3, 255)
+    dilated = cv2.dilate( thresh, np.ones((3, 3), np.uint8), iterations=1)
     
     ##      Find the contours within the computed edge map; sort by size in desc order
-    contours = cv2.findContours( thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = cv2.findContours( dilated.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnt = contours[1]
     cnt = sorted(cnt, key=cv2.contourArea, reverse=True)
     
@@ -128,7 +128,7 @@ elif option == 2:
     
     
     #For now, change this for file location
-    images = glob.glob(fileLocC)
+    images = glob.glob(fileLocA)
     
     data = []
     for files in images:
@@ -156,9 +156,9 @@ elif option == 2:
             res = cv2.bitwise_and( im, mask)
             
             #Change contour output location & image type here
-            print(outputImages + contourC + str(idx) + png)
+            print(outputImages + contourA + str(idx) + png)
             
-            cv2.imwrite( (outputImages + contourC + str(idx) + png), res)
+            cv2.imwrite( (outputImages + contourA + str(idx) + png), res)
             idx += 1
         except Exception as e:
             print(e)
