@@ -54,8 +54,8 @@ def preprocessImage(img):
     # cont -> for Bounding Rect
     cont = max( cnt, key=cv2.contourArea)
     
-    # Initialise signDetect
-    #signDetect = SignDetector()
+    ## Draw mask
+    mask = np.zeros( img.shape, np.uint8)
     
     for c in cnt:
         #sign = signDetect.findSign( c)
@@ -68,12 +68,11 @@ def preprocessImage(img):
             sign = aprx
             
         # Draw the sign contour
-        cv2.drawContours( img, [sign], -1, (0, 255, 0), 3)
+        cv2.drawContours( mask, [sign], -1, (255, 255, 255), -1)
         
         #cv2.drawContours( img, c, 0, (0, 0, 255), 4)
         
-    ## Draw mask
-    mask = np.zeros( img.shape, np.uint8)
+    
     #cv2.drawContours( mask, cnt, 0, (255,255,255), 3)
     
     ## Draw contours on img
@@ -83,7 +82,7 @@ def preprocessImage(img):
     #x, y, w, h = cv2.boundingRect( cont)
     #cv2.rectangle( img, (x,y), (x+w, y+h), (255, 0, 0), 2)
 
-    return img
+    return mask
 
 ### END-MASK DETECTION
 
@@ -126,7 +125,7 @@ elif option == 2:
     
     
     #For now, change this for file location
-    images = glob.glob(fileLocC)
+    images = glob.glob(fileLocB)
     
     data = []
     for files in images:
@@ -150,11 +149,13 @@ elif option == 2:
     idx = 0
     for im in data:
         try:
-            result = preprocessImage(im)
-            #Change contour output location & image type here
-            print(outputImages + contourC + str(idx) + jpg)
+            mask = preprocessImage(im)
+            res = cv2.bitwise_and( im, mask)
             
-            cv2.imwrite( (outputImages + contourC + str(idx) + jpg), result)
+            #Change contour output location & image type here
+            print(outputImages + contourB + str(idx) + jpg)
+            
+            cv2.imwrite( (outputImages + contourB + str(idx) + jpg), res)
             idx += 1
         except Exception as e:
             print(e)
