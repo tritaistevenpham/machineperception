@@ -45,7 +45,9 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     #fileName = 'label-7-radioactive-ii.png' #YELLOWWHITE
     #fileName = 'label-8-corrosive.png' #BLACKWHITE
     #fileName = 'label-4-dangerous-when-wet.png'#BLUE
-    fileName = 'label-2-non-flammable-gas.png' #GREEN
+    #fileName = 'label-2-non-flammable-gas.png' #GREEN
+    #fileName = 'P1380463.JPG' #green B
+    fileName = 'P1380486.JPG' #orange B
     ## Option 1: Read a single file
     img_orig = cv2.imread( fileName, cv2.IMREAD_COLOR)
     
@@ -55,8 +57,10 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     
     mask = cv2.resize( mask, ( 500, 500))
     
-    pp.findColours( mask)
-    pp.readSign( mask)
+    #pp.findColours( mask)
+    pp.detectHSVColours( mask)
+    
+    #pp.readSign( mask)
     
     cv2.imshow( 'res', mask)
     ## Perform perspective transform on the mask for expected working space
@@ -94,14 +98,15 @@ elif option == 2:
             ##  1st, 2nd, 3rd row detects symbol
             ##  2nd, 3rd, 4th row detects words
             ##  1st, 2nd, 3rd, 5th row detects class(es)
-            blur = pp.findColours( mask)
-            pp.readSign( mask)
+            #blur = pp.findColours( mask)
+            pp.detectHSVColours( mask)
+            #pp.readSign( mask)
             
             ## Change contour output location & image type here
             #print( outputImages + contourB + str(idx) + jpg)
             #print( outputImages + contourA + fn)
             
-            cv2.imwrite( ( outputImages + contourB + fn), blur)
+            cv2.imwrite( ( outputImages + contourB + fn), mask)
             print( '')
             #cv2.imwrite( ( outputImages + contourB + str(idx) + jpg), res)
             #idx += 1
