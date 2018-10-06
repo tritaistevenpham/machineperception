@@ -5,6 +5,7 @@ import numpy as np
 ## Import user-defined functions
 import TransformFunctions as tf
 import pytesseract as pt
+import math as m
 
 ### START-MASK DETECTION
 
@@ -94,7 +95,6 @@ def colourBalance( img):
     ret_img[ :, :, 1] = ret_img[ :, :, 1] - ( ( avg1 - 128) * ( ret_img[ :, :, 0] / 255.0) * 1.1)
     ret_img[ :, :, 2] = ret_img[ :, :, 2] - ( ( avg2 - 128) * ( ret_img[ :, :, 0] / 255.0) * 1.1)
     ret_img = cv2.cvtColor( ret_img, cv2.COLOR_LAB2BGR)
-    cv2.imshow( 'colour balance', ret_img)
     
     return ret_img
 
@@ -112,8 +112,6 @@ def detectHSVColours( img):
     ## Select likely top and bottom of the image
     colour1 = hsv_img[ 190, 395]
     colour2 = hsv_img[ 370, 190]
-    print( colour1)
-    print( colour2)
     
     ## Initialise colour output
     topShow = 'top:'
@@ -206,19 +204,156 @@ def detectHSVColours( img):
 
 def divideImage( img_orig):
     ## Set the img width and height
-    img = img_orig.copy()
-    imgh, imgw = img.shape[ :2]
+    crop_0 = img_orig.copy()
+    imgh, imgw = crop_0.shape[ :2]
     
-    numRows = 5
+    ## Cut image in 5ths: image[y/2, x]
+    secHeight = int( m.floor( imgh // 5))
     
-    ## Set value to divide the image up: 5 equal rows
-    rowHeight = imgh / 5.0
+    ## Create sections to begin cropping the image (for 5 row sections)
+    crop_1 = crop_0[ secHeight:, :]
+    crop_2 = crop_1[ secHeight:, :]
+    crop_3 = crop_2[ secHeight:, :]
+    crop_4 = crop_3[ secHeight:, :]
     
-    ## Draw the mask for the number of sections -> 5
-    #for ii in range( 0, numRows):
-        
-
+    ## Create the sections and store them as new images for processing
+    sec1 = crop_0[ :secHeight, :]
+    sec2 = crop_1[ :secHeight, :]
+    sec3 = crop_2[ :secHeight, :]
+    sec4 = crop_3[ :secHeight, :]
+    sec5 = crop_4[ :secHeight, :]
+    
+    rows = [sec1, sec2, sec3, sec4, sec5]
+    return rows
+    
 ### END-DIVIDE IMAGE FUNCTION
+
+### START-CLASS CLASSIFICATION
+
+def readClass( rows):
+    ## Combine the 4th and 5th rows for class classification
+    img = np.concatenate( (rows[3], rows[4]), axis=0)
+    
+    img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
+    
+   #img = cv2.GaussianBlur( img, (5,5), 0)
+    
+    #cv2.imshow( 'adap', img)
+    #img = cv2.morphologyEx( img, cv2.MORPH_CLOSE, np.ones( ( 5, 5), np.uint8))
+    img = cv2.medianBlur( img, 9)
+    
+    
+    #ret, img = cv2.threshold( img, 127, 255, cv2.THRESH_BINARY)
+    
+    #img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=2)
+    #img = cv2.erode( img, np.ones( ( 3, 3), np.uint8), iterations=1)
+    #img = cv2.dilate( img, np.ones( ( 3, 3), np.uint8), iterations=1)
+    
+    ## Apply adaptive thresholding to get the class number:
+    img = cv2.adaptiveThreshold( img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 2)
+    
+    cv2.imshow( 'close', img)
+    
+    ## Find Contours on the OCR Template for Class:
+    templ_ref = cv2.imread( './Template/0to9ArialBlack.PNG', cv2.IMREAD_COLOR)
+    templ_ref = cv2.cvtColor( templ_ref, cv2.COLOR_BGR2GRAY)
+    
+    ## Threshold the template image
+    templ_ref = cv2.threshold( templ_ref, 10, 255, cv2.THRESH_BINARY_INV)[ 1]
+    ocr_cont = cv2.findContours( templ_ref.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    ocr_cont = ocr_cont[1]
+    
+    ## Sort the OCR Template contours from left to right 
+    ocr_cont.sort(key=lambda x:tf.getContPrec(x, templ_ref.shape[ 1]))
+    
+    ## Initialise a digits set which match digit to roi - {} dictionary assignment
+    digits = {}
+    
+    ## Loop over the OCR Template
+    for( i, c) in enumerate( ocr_cont):
+        ## Compute each digit's bounding box, extract it, and resize appropriately
+        ( x, y, w, h) = cv2.boundingRect( c)
+        ## Pad the template 
+        roi = templ_ref[ y-5:y+h+5, x-5:x+w+5]
+        roi = cv2.resize( roi, ( 57, 88))
+        
+        digits[ i] = roi
+        
+    #cv2.imshow( 'digit template', digits[1])
+    
+    
+    #img = cv2.dilate( img, np.ones( ( 5, 5), np.uint8), iterations=1)
+    #img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=1)
+    ## If image is more white than black, invet, else leave as is
+    num_white = np.sum( img == 255)
+    if num_white > 2500: 
+        img = cv2.bitwise_not(img)
+    
+    
+    cv2.imshow( 'img after bitwise', img)
+    
+    ## Find contours in the sectioned image
+    #cv2.imshow( 'imgnot', img_not)
+    img_cnts = cv2.findContours( img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    img_cnts = img_cnts[1]
+    
+    locs = []
+
+    for( i, c) in enumerate( img_cnts):
+        ( x, y, w, h) = cv2.boundingRect( c)
+        
+        ## Check if contour pixel height is sensible for a number
+        if( w > 10 and w < 80) and ( h > 30 and h < 100):
+            if cv2.contourArea( c) > 200:
+                cv2.rectangle( img, ( x, y), ( x + w, y + h), ( 0, 255, 0), 2)
+                ## Append the region to locs
+                locs.append( ( x, y, w, h))
+    ## Sort the detected contours from left to right
+    locs = sorted( locs, key=lambda x:x[0])
+    
+    ## Output will show the extracted number
+    output = []
+    
+    ## Loop over the existing potential numbers:
+    for( i, ( lX, lY, lW, lH)) in enumerate( locs):
+        
+        
+        ## Extract the digit from binary section image
+        dig = img[ lY - 5: lY + lH + 5, lX - 5: lX + lW + 5]
+        ## Threshold to segment the digit from background
+        #dig = cv2.threshold( dig, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[ 1]
+        #cv2.imshow( 'dig', dig)
+        ## Initialise a list of template matching scores
+        scores = []
+        #for c in digitCont:
+        roi = dig
+        if roi.shape[0] and roi.shape[1] > 0:
+            roi = cv2.resize( roi, ( 57, 88))
+            
+            roi_white = np.sum( roi == 255)
+            if roi_white > 2000:
+                roi = cv2.bitwise_not(roi)
+            cv2.imshow( 'roi', roi)
+            #cv2.imshow( 'dig', dig)
+            
+            ## Loop over reference digit and digit ROI:
+            for( digit, digitROI) in digits.items():
+                ## Apply template matching and score
+                result = cv2.matchTemplate( roi, digitROI, cv2.TM_CCOEFF)
+                ( _, score, _, _) = cv2.minMaxLoc( result)
+                scores.append( score)
+                
+            ## Scores should match with template contours -> already sorted     
+            output.append( str( np.argmax( scores)))
+            
+    ## Update the digits list
+    if len( output) > 0:
+        print( 'class: {}'.format( '.'.join( output)))
+    else:
+        print( 'class: none')
+    #cv2.imshow( 'class', img)
+
+### END-CLASS CLASSIFICATION
 
 ### START-OCR
 

@@ -47,7 +47,7 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     #fileName = 'label-4-dangerous-when-wet.png'#BLUE
     #fileName = 'label-2-non-flammable-gas.png' #GREEN
     #fileName = 'P1380463.JPG' #green B
-    fileName = 'P1380463.JPG' #orange B
+    fileName = 'P1380475.JPG' #orange B
     ## Option 1: Read a single file
     img_orig = cv2.imread( fileName, cv2.IMREAD_COLOR)
     
@@ -55,10 +55,16 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     img = tf.resizeFunc( img_orig, 900, 900)
     mask = pp.preprocessImage( img)
     
+    ## Re-size the transform to work in a smaller but consistent space (same as Set A sizes)
     mask = cv2.resize( mask, ( 500, 500))
+    
+    ## Prepare colour balance and detect the colours
     cb = pp.colourBalance( mask)
-    #pp.findColours( mask)
     pp.detectHSVColours( cb)
+    
+    ## Prepare the image subdivisions for character and symbol processing
+    rows = pp.divideImage( mask)
+    pp.readClass( rows)
     
     #pp.readSign( mask)
     
@@ -102,7 +108,9 @@ elif option == 2:
             cb = pp.colourBalance( mask)
             pp.detectHSVColours( cb)
             #pp.readSign( mask)
-            
+            ## Prepare the image subdivisions for character and symbol processing
+            rows = pp.divideImage( mask)
+            pp.readClass( rows)
             ## Change contour output location & image type here
             #print( outputImages + contourB + str(idx) + jpg)
             #print( outputImages + contourA + fn)

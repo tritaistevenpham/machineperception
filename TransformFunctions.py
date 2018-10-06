@@ -64,11 +64,30 @@ def resizeFunc( img_orig, max_h, max_w):
         
     if( max_h <= imgh or max_w <= imgw):
         # Re-size for consistency across all images
-        r = max_h / float( imgh)
-        if( max_w / float( imgw) < r):
-            r = max_w / float( imgw)
+        scale = max_h / float( imgh)
+        if( max_w / float( imgw) < scale):
+            scale = max_w / float( imgw)
         
-        img = cv2.resize( img_orig, None, fx=r, fy=r, interpolation = cv2.INTER_AREA)
-    return img 
+        img = cv2.resize( img_orig, None, fx=scale, fy=scale, interpolation = cv2.INTER_AREA)
+    return img
 
 ### END-RESIZE FUNCTION
+
+### START-SORT CONTOURS FUNCTION
+
+def getContPrec( contour, cols):
+    origin = cv2.boundingRect( contour)
+    return ( ( origin[1] // 5) * 5 ) * cols + origin[ 0]
+
+def sortContours( cnts):
+    ## Initialise reverse flag and index
+    reverse = True
+    idx = 1
+    
+    ## Construct the bounding boxes:
+    bounding = [ cv2.boundingRect( c) for c in cnts]
+    ( cnts, bounding) = zip( *sorted( zip( cnts, bounding), key=lambda b:b[1][idx], reverse=reverse))
+    
+    return (cnts, bounding)
+
+### END-SORT CONTOURS FUNCTION
