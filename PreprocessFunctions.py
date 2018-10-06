@@ -80,95 +80,115 @@ def preprocessImage( img):
 def nothing( x):
     pass
 
+def colourBalance( img):
+    result = cv2.cvtColor( img, cv2.COLOR_BGR2LAB)
+    avg_a = np.average( result[ :, :, 1])
+    avg_b = np.average( result[ :, :, 2])
+    result[ :, :, 1] = result[ :, :, 1] - ( ( avg_a - 128) * ( result[ :, :, 0] / 255.0) * 1.1)
+    result[ :, :, 2] = result[ :, :, 2] - ( ( avg_b - 128) * ( result[ :, :, 0] / 255.0) * 1.1)
+    result = cv2.cvtColor( result, cv2.COLOR_LAB2BGR)
+    cv2.imshow( 'colour balance', result)
+    return result
+
 def detectHSVColours( img):
-    #img = cv2.imread( 'P1380454.JPG', 1)
+    
+    ## Give the image a blur to filter out small noise
     blurred = cv2.GaussianBlur( img, (5,5), 0)
-    #closed = cv2.cvtColor( blurred, cv2.COLOR_GRAY2BGR)
     
-    closed = cv2.morphologyEx( blurred, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
+    ## Help the smoothing with a morphology erosion and dilation
+    closed = cv2.morphologyEx( img, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
     
+    ## Use the HSV colourspace to classify colours
     hsv_img = cv2.cvtColor( closed, cv2.COLOR_BGR2HSV)
     
-    cv2.imshow( 'hsv', hsv_img)
-    
+    ## Select likely top and bottom of the image
     colour1 = hsv_img[ 190, 395]
-    colour2 = hsv_img[ 450, 250]
+    colour2 = hsv_img[ 380, 200]
     print( colour1)
     print( colour2)
     
+    ## Initialise colour output
     topShow = 'top:'
     botShow = 'bot:'
+    actualTop = ''
+    actualBot = ''
     
-    #Orange, Red, Yellow need a tighter range check in HSV than the others as they are similar
+    ## Colour HSV range thresholding to find the correct values to classify the data set based
+    ## on Simple Background Images
     
+    ## Check for White
+    if (colour1[0] >= 0 and colour1[0] <= 24) or (colour1[0] >= 70 and colour1[0] <= 120):
+        if (colour1[1] >= 0 and colour1[1] <= 85):
+            if (colour1[2] >= 120 and colour1[2] <= 130) or colour1[2] >= 145:
+                actualTop = ' white'
+        
+    if (colour2[0] >= 0 and colour2[0] <= 24) or (colour2[0] >= 70 and colour2[0] <= 120):
+        if (colour2[1] >= 0 and colour2[1] <= 85):
+            if (colour2[2] >= 120 and colour2[2] <= 130) or colour2[2] >= 145:
+                actualBot = ' white'
+                
     ## Check for Green
     if colour1[0] >= 20 and colour1[0] <= 90:
-        if colour1[1] >= 70 and colour1[1] <= 140:
-            topShow += ' green'
+        if colour1[1] >= 70 and colour1[1] <= 130:
+            actualTop = ' green'
         
     if colour2[0] >= 20 and colour2[0] <= 90:
-        if colour2[1] >= 70 and colour2[1] <= 140:
-            botShow += ' green'
+        if colour2[1] >= 70 and colour2[1] <= 130:
+            actualBot = ' green'
             
     ## Check for Orange
-    if (colour1[0] >= 0 and colour1[0] <= 16) or (colour1[0] >= 176 and colour1[0] <= 179):
-        if (colour1[1] >= 171 and colour1[1] <= 255) or (colour1[2] >= 195 and colour1[2] <= 215):
-            topShow += ' orange'
-        
-    if (colour2[0] >= 0 and colour2[0] <= 16) or (colour2[0] >= 176 and colour2[0] <= 179):
-        if (colour2[1] >= 171 and colour2[1] <= 255) or (colour2[2] >= 75 and colour2[2] <= 90):
-            botShow += ' orange'
+    if (colour1[2] >= 144 and colour1[2] <= 255):
+        if (colour1[0] >= 4 and colour1[0] <= 16) or (colour1[0] >= 176 and colour1[0] <= 179):
+            if colour1[1] >= 70:
+                actualTop = ' orange'
+                
+    if (colour2[2] >= 144 and colour2[2] <= 255):    
+        if (colour2[0] >= 4 and colour2[0] <= 16) or (colour2[0] >= 176 and colour2[0] <= 179):
+            if colour2[1] >= 70:
+                actualBot = ' orange'
     
     ## Check for Red
-    if (colour1[0] >= 160 and colour1[0] <= 179) or (colour1[0] >= 0 and colour1[0] <= 10):
-        if colour1[1] >= 100 and colour1[1] <= 180:
-            topShow += ' red'
+    if (colour1[0] >= 160 and colour1[0] <= 179) or (colour1[0] >= 0 and colour1[0] <= 5):
+        if colour1[1] >= 110 and colour1[1] <= 178:
+            if colour1[2] <= 197:
+                actualTop = ' red'
         
-    if (colour2[0] >= 160 and colour2[0] <= 179) or (colour2[0] >= 0 and colour2[0] <= 10):
-        if colour2[1] >= 100 and colour2[1] <= 180:
-            botShow += ' red'
+    if (colour2[0] >= 160 and colour2[0] <= 179) or (colour2[0] >= 0 and colour2[0] <= 5):
+        if colour2[1] >= 110 and colour2[1] <= 178:
+            if colour2[2] <= 197:
+                actualBot = ' red'
     
     ## Check for Blue
     if colour1[0] >= 105 and colour1[0] <= 125:
-        if colour1[2] >= 108 and colour1[2] <= 150:
-            if (colour1[1] >= 35 and colour1[1] <= 90) or (colour1[1] >= 135 and colour1[1] <= 200):
-                topShow += ' blue'
+        if colour1[2] >= 108 and colour1[2] <= 139:
+            if (colour1[1] >= 20 and colour1[1] <= 95) or (colour1[1] >= 125 and colour1[1] <= 200):
+                actualTop = ' blue'
     
     if colour2[0] >= 105 and colour2[0] <= 125:
-        if colour2[2] >= 108 and colour2[2] <= 150:
-            if (colour2[1] >= 35 and colour2[1] <= 90) or (colour2[1] >= 135 and colour2[1] <= 200):
-                botShow += ' blue'
-    
-    ## Check for White
-    if (colour1[0] >= 0 and colour1[0] <= 120):
-        if (colour1[1] >= 0 and colour1[1] <= 90):
-            if colour1[2] >= 140:
-                topShow += ' white'
-        
-    if (colour2[0] >= 0 and colour2[0] <= 120):
-        if (colour2[1] >= 0 and colour2[1] <= 90):
-            if colour2[2] >= 140:
-                botShow += ' white'
+        if colour2[2] >= 108 and colour2[2] <= 139:
+            if (colour2[1] >= 20 and colour2[1] <= 95) or (colour2[1] >= 125 and colour2[1] <= 200):
+                actualBot = ' blue'
         
     ## Check for Black
     if colour1[0] >= 10 and colour1[0] <= 50:
-        if colour2[2] >= 0 and colour2[2] <= 105:
-            topShow += ' black'
+        if colour1[2] >= 0 and colour1[2] <= 110:
+            actualTop = ' black'
     
     if colour2[0] >= 10 and colour2[0] <= 50:
-        if colour2[2] >= 0 and colour2[2] <= 105:
-            botShow += ' black'
+        if colour2[2] >= 0 and colour2[2] <= 110:
+            actualBot = ' black'
             
     ## Check for Yellow
     if colour1[0] >= 17 and colour1[0] <= 30:
-        if colour1[1] >= 168 and colour1[1] <= 214:
-            topShow += ' yellow'
+        if colour1[1] >= 118 and colour1[1] <= 213:
+            actualTop = ' yellow'
             
     if colour2[0] >= 17 and colour2[0] <= 30:
-        if colour2[1] >= 168 and colour2[1] <= 214:
-            botShow += ' yellow'
+        if colour2[1] >= 118 and colour2[1] <= 213:
+            actualBot = ' yellow'
     
-    
+    topShow += ''.join( actualTop)
+    botShow += ''.join( actualBot)
     print( topShow)
     print( botShow)
     
