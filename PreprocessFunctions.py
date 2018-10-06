@@ -77,23 +77,31 @@ def preprocessImage( img):
 ### END-MASK DETECTION
 
 ### START-PREPROCESSING FOR COLOUR FUNCTION
-def nothing( x):
-    pass
 
 def colourBalance( img):
-    result = cv2.cvtColor( img, cv2.COLOR_BGR2LAB)
-    avg_a = np.average( result[ :, :, 1])
-    avg_b = np.average( result[ :, :, 2])
-    result[ :, :, 1] = result[ :, :, 1] - ( ( avg_a - 128) * ( result[ :, :, 0] / 255.0) * 1.1)
-    result[ :, :, 2] = result[ :, :, 2] - ( ( avg_b - 128) * ( result[ :, :, 0] / 255.0) * 1.1)
-    result = cv2.cvtColor( result, cv2.COLOR_LAB2BGR)
-    cv2.imshow( 'colour balance', result)
-    return result
+    ## Function for colour balancing from:
+    ## https://stackoverflow.com/a/46391574 - norok2 (Sep 24 '17)
+    
+    ## Use the LAB colourspace to balance the image luminosity
+    ret_img = cv2.cvtColor( img, cv2.COLOR_BGR2LAB)
+    
+    ## Use NumPy's average function to find the average for A and B of the image
+    avg1 = np.average( ret_img[ :, :, 1])
+    avg2 = np.average( ret_img[ :, :, 2])
+    
+    ## Apply an averaging calculation on the output image:
+    ## Image pixel - ( ( average - 128) * image pixel luminosity / 255) * 1.1 scalar )
+    ret_img[ :, :, 1] = ret_img[ :, :, 1] - ( ( avg1 - 128) * ( ret_img[ :, :, 0] / 255.0) * 1.1)
+    ret_img[ :, :, 2] = ret_img[ :, :, 2] - ( ( avg2 - 128) * ( ret_img[ :, :, 0] / 255.0) * 1.1)
+    ret_img = cv2.cvtColor( ret_img, cv2.COLOR_LAB2BGR)
+    cv2.imshow( 'colour balance', ret_img)
+    
+    return ret_img
 
 def detectHSVColours( img):
     
     ## Give the image a blur to filter out small noise
-    blurred = cv2.GaussianBlur( img, (5,5), 0)
+    blurred = cv2.GaussianBlur( img, (5,5), 3)
     
     ## Help the smoothing with a morphology erosion and dilation
     closed = cv2.morphologyEx( img, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
@@ -103,7 +111,7 @@ def detectHSVColours( img):
     
     ## Select likely top and bottom of the image
     colour1 = hsv_img[ 190, 395]
-    colour2 = hsv_img[ 380, 200]
+    colour2 = hsv_img[ 370, 190]
     print( colour1)
     print( colour2)
     
@@ -119,12 +127,12 @@ def detectHSVColours( img):
     ## Check for White
     if (colour1[0] >= 0 and colour1[0] <= 24) or (colour1[0] >= 70 and colour1[0] <= 120):
         if (colour1[1] >= 0 and colour1[1] <= 85):
-            if (colour1[2] >= 120 and colour1[2] <= 130) or colour1[2] >= 145:
+            if (colour1[2] >= 120 and colour1[2] <= 130) or colour1[2] >= 141:
                 actualTop = ' white'
         
     if (colour2[0] >= 0 and colour2[0] <= 24) or (colour2[0] >= 70 and colour2[0] <= 120):
         if (colour2[1] >= 0 and colour2[1] <= 85):
-            if (colour2[2] >= 120 and colour2[2] <= 130) or colour2[2] >= 145:
+            if (colour2[2] >= 120 and colour2[2] <= 130) or colour2[2] >= 141:
                 actualBot = ' white'
                 
     ## Check for Green
@@ -138,12 +146,12 @@ def detectHSVColours( img):
             
     ## Check for Orange
     if (colour1[2] >= 144 and colour1[2] <= 255):
-        if (colour1[0] >= 4 and colour1[0] <= 16) or (colour1[0] >= 176 and colour1[0] <= 179):
+        if (colour1[0] >= 4 and colour1[0] <= 15) or (colour1[0] >= 176 and colour1[0] <= 179):
             if colour1[1] >= 70:
                 actualTop = ' orange'
                 
     if (colour2[2] >= 144 and colour2[2] <= 255):    
-        if (colour2[0] >= 4 and colour2[0] <= 16) or (colour2[0] >= 176 and colour2[0] <= 179):
+        if (colour2[0] >= 4 and colour2[0] <= 15) or (colour2[0] >= 176 and colour2[0] <= 179):
             if colour2[1] >= 70:
                 actualBot = ' orange'
     
@@ -160,206 +168,38 @@ def detectHSVColours( img):
     
     ## Check for Blue
     if colour1[0] >= 105 and colour1[0] <= 125:
-        if colour1[2] >= 108 and colour1[2] <= 139:
-            if (colour1[1] >= 20 and colour1[1] <= 95) or (colour1[1] >= 125 and colour1[1] <= 200):
+        if (colour1[1] >= 0 and colour1[1] <= 50) or (colour1[1] >= 125 and colour1[1] <= 200):
+            if colour1[2] >= 108 and colour1[2] <= 132:
                 actualTop = ' blue'
     
     if colour2[0] >= 105 and colour2[0] <= 125:
-        if colour2[2] >= 108 and colour2[2] <= 139:
-            if (colour2[1] >= 20 and colour2[1] <= 95) or (colour2[1] >= 125 and colour2[1] <= 200):
+        if (colour2[1] >= 0 and colour2[1] <= 50) or (colour2[1] >= 125 and colour2[1] <= 200):
+            if colour2[2] >= 108 and colour2[2] <= 132:
                 actualBot = ' blue'
         
     ## Check for Black
-    if colour1[0] >= 10 and colour1[0] <= 50:
+    if colour1[0] >= 10 and colour1[0] <= 55:
         if colour1[2] >= 0 and colour1[2] <= 110:
             actualTop = ' black'
     
-    if colour2[0] >= 10 and colour2[0] <= 50:
+    if colour2[0] >= 10 and colour2[0] <= 55:
         if colour2[2] >= 0 and colour2[2] <= 110:
             actualBot = ' black'
             
     ## Check for Yellow
-    if colour1[0] >= 17 and colour1[0] <= 30:
-        if colour1[1] >= 118 and colour1[1] <= 213:
+    if colour1[0] >= 14 and colour1[0] <= 30:
+        if colour1[1] >= 115 and colour1[1] <= 213:
             actualTop = ' yellow'
             
-    if colour2[0] >= 17 and colour2[0] <= 30:
-        if colour2[1] >= 118 and colour2[1] <= 213:
+    if colour2[0] >= 14 and colour2[0] <= 30:
+        if colour2[1] >= 115 and colour2[1] <= 213:
             actualBot = ' yellow'
     
     topShow += ''.join( actualTop)
     botShow += ''.join( actualBot)
     print( topShow)
     print( botShow)
-    
-def findColours( img):
-    ## Define the lower and upper boundaries for expected colours
-    ## White  - Lower: H:0 S:0 V:230    | Upper: H: 255 S:0 V:255  
-    ## Black  - Lower: H:0 S:0 V:0      | Upper: H:255 S:255 V:0
-    ## Yellow - Lower: H:23 S:60 V:120  | Upper: H:54 S:255 V:255
-    ## Red    - Lower: H:165 S:204 V:128| Upper: H:186 S:230 V:255
-    ## Orange - Lower: H:10 S:50 V:80   | Upper: H:20 S:255 V:255
-    ## Green  - Lower: H:60 S:120 V:129 | Upper: H:83 S:255 V:255
-    ## Blue   - Lower: H:98 S:110 V:100 | Upper: H:117 S:255 V:255
 
-    ## Lower key-value
-    lower = { 'white':( 0, 0, 0), #
-              'black':( 0, 0, 0), #
-              'yellow':( 22, 180, 230), #
-              'red':( 160, 0, 180),#
-              'orange': ( 0, 112, 207), #
-              'green':( 38, 94, 0), #
-              'blue':( 75, 60, 26)}
-    
-    upper = { 'white':( 0, 0, 178), #
-              'black':( 0, 0, 76), #
-              'yellow':( 38, 255, 255), #
-              'red':( 179, 0, 255), #
-              'orange': ( 22, 138, 255), #
-              'green':( 75, 255, 0), #
-              'blue':( 130, 116, 255)}
-    
-    blurred = cv2.GaussianBlur( img, (5,5), 0)
-    #closed = cv2.cvtColor( blurred, cv2.COLOR_GRAY2BGR)
-    
-    closed = cv2.morphologyEx( blurred, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
-    cv2.imshow( 'colour morph', closed)
-    
-    colour1 = closed[190,395]
-    ## If colour = white, black, yellow, red, orange, green, blue... BGR
-    colour2 = closed[450,250]
-    print( colour1)
-    print( colour2)
-    
-    topHalf = 'top: '
-    bottomHalf = 'bottom: '
-    
-    ## Check for Black
-    if colour1[0] >= 0 and colour1[0] <= 90:
-        if colour1[1] >= 0 and colour1[1] <= 90: 
-            if colour1[2] >= 0 and colour1[2] <= 90:
-                topHalf += 'black'
-                #rint( topHalf)
-        
-    if colour2[0] >= 0 and colour2[0] <= 90:
-        if colour2[1] >= 0 and colour2[1] <= 90:
-            if colour2[2] >= 0 and colour2[2] <= 90:
-                bottomHalf += 'black'
-                #print( bottomHalf)
-                
-    ## Check for White
-    if colour1[0] >= 105 and colour1[0] <= 255:
-        if colour1[1] >= 105 and colour1[1] <= 255:
-            if colour1[2] >= 110 and colour1[2] <= 255:
-                topHalf += 'white'
-                #print( topHalf)
-    
-    if colour2[0] >= 105 and colour2[0] <= 255:
-        if colour2[1] >= 105 and colour2[1] <= 255:
-            if colour2[2] >= 110 and colour2[2] <= 255:
-                bottomHalf += 'white'
-                #print( bottomHalf)
-                
-    ## Check for Yellow
-    if colour1[0] >= 0 and colour1[0] <= 65:
-        if colour1[1] >= 80 and colour1[1] <= 199:
-            if colour1[2] >= 130 and colour1[2] <= 255:
-                topHalf += 'yellow'
-                #print( topHalf)
-    
-    if colour2[0] >= 0 and colour2[0] <= 65:
-        if colour2[1] >= 80 and colour2[1] <= 199:
-            if colour2[2] >= 130 and colour2[2] <= 255:
-                bottomHalf += 'yellow'
-                #print( bottomHalf)
-                
-    ## Check for Red
-    if colour1[0] >= 15 and colour1[0] <= 85:
-        if colour1[1] >= 0 and colour1[1] <= 80:
-            if colour1[2] >= 110 and colour1[2] <= 255:
-                topHalf += 'red'
-                #print( topHalf)
-    
-    if colour2[0] >= 15 and colour2[0] <= 85:
-        if colour2[1] >= 0 and colour2[1] <= 80:
-            if colour2[2] >= 110 and colour2[2] <= 255:
-                bottomHalf += 'red'
-                #print( bottomHalf)
-                
-    ## Check for Orange
-    if colour1[0] >= 55 and colour1[0] <= 70:
-        if colour1[1] >= 80 and colour1[1] <= 145:
-            if colour1[2] >= 200 and colour1[2] <= 255:
-                topHalf += 'orange'
-                #print( topHalf)
-    
-    if colour2[0] >= 55 and colour2[0] <= 70:
-        if colour2[1] >= 80 and colour2[1] <= 145:
-            if colour2[2] >= 200 and colour2[2] <= 255:
-                bottomHalf += 'orange'
-                #print( bottomHalf)
-                
-    ## Check for Green
-    if colour1[0] >= 45 and colour1[0] <= 65:
-        if colour1[1] >= 125 and colour1[1] <= 255:
-            if colour1[2] >= 0 and colour1[2] <= 180:
-                topHalf += 'green'
-                #print( topHalf)
-    
-    if colour2[0] >= 45 and colour2[0] <= 65:
-        if colour2[1] >= 125 and colour2[1] <= 255:
-            if colour2[2] >= 0 and colour2[2] <= 180:
-                bottomHalf += 'green'
-                #print( bottomHalf)
-    
-    ## Check for Blue
-    if colour1[0] >= 110 and colour1[0] <= 255:
-        if colour1[1] >= 55 and colour1[1] <= 110:
-            if colour1[2] >= 30 and colour1[2] <= 110:
-                topHalf += 'blue'
-                #print( topHalf)
-    
-    if colour2[0] >= 110 and colour2[0] <= 255:
-        if colour2[1] >= 55 and colour2[1] <= 110:
-            if colour2[2] >= 30 and colour2[2] <= 110:
-                bottomHalf += 'blue'
-                #print( bottomHalf)
-                
-    print( topHalf)
-    print( bottomHalf)
-    
-    ## Pre-process: 
-    ## Apply a GaussianBlur
-    #gblur = cv2.GaussianBlur( img, ( 5, 5), 0)
-    
-    ## Convert image into HSV 
-    #rgb = cv2.cvtColor( gblur, cv2.COLOR_BGR2RGB)
-    
-    ## For each colour in pre-defined colour values
-    #for key, value in upper.items():
-        ## Construct a mask for the colour of each key
-        ## Supply an erosion and dilation kernel
-        #kern = np.ones( ( 9, 9), np.uint8)
-        
-        #mask = cv2.inRange( img, lower[key], upper[key])
-        #cv2.imshow( 'out', mask)
-        #print( lower[key], ' ',upper[key])
-        
-        ## Perform some erosions and dilations to close up any noise
-        #mask = cv2.morphologyEx( mask, cv2.MORPH_OPEN, kern)
-        #mask = cv2.morphologyEx( mask, cv2.MORPH_CLOSE, kern)
-        
-        ## Find the contours of the mask
-        #cnts = cv2.findContours( mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[ -2]
-        
-        #for c in cnts:
-            #perimeter = cv2.arcLength( c, True)
-            #aprx = cv2.approxPolyDP( c, 0.02 * perimeter, True)
-            
-            #if cv2.contourArea( aprx) > float( 0.5):
-                #mask = cv2.drawContours( mask, [aprx], -1, (0,0,255), 3)
-    return closed
-    
 ### END-PREPROCESSING FOR COLOUR FUNCTION
 
 ### START-DIVIDE IMAGE FUNCTION
