@@ -672,6 +672,6 @@ def findCharacters( rows):
             corrected = 'GASOLINE'
         print( resultText + corrected)
     else:
-        print( 'text: none')
+        print( 'text: (none)')
     
 ### END-CHARACTER CLASSIFICATION
