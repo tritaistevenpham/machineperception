@@ -1,3 +1,9 @@
+""" COMP3007 - Machine Perception Assignment
+        Author: Tri Tai Steven Pham
+        Student ID: 17748229
+        Year: 2018
+"""
+
 ## Import libraries
 import cv2
 import numpy as np
@@ -8,13 +14,18 @@ import pytesseract as pt
 import math as m
 
 ### START-MASK DETECTION
+##      This function is used to eliminate the background from the hazmat label
+##      It uses a series of filters and smoothing techniques to filter out the background
+##      It was almost prepared to tackle Set C however it now only perfectly detects 
+##      items from Set B (and Set A)
+##
 
 def preprocessImage( img):
     ##  First convert the image into grayscale for pre-processing
     warp = img.copy()
     img_eq = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
     
-    #Create adaptive histogram equalisation to deal with shadows
+    ## Create adaptive histogram equalisation to deal with shadows
     clahe = cv2.createCLAHE( clipLimit=2.0, tileGridSize=( 8, 8))
     cl = clahe.apply( img_eq)
       
@@ -49,6 +60,10 @@ def preprocessImage( img):
     ## Set up points to transform
     points = np.zeros( ( 4, 2), dtype = "float32")
     
+    """ I have decided to analyse the contours and make a judgement on approximated
+        points. I have chosen to look for 4 equal points approximated from each other and 
+        declared them as the points of a square - or the sign in question.
+    """
     for c in cnt:
         perimeter = cv2.arcLength( c, True)
         aprx = cv2.approxPolyDP( c, 0.02 * perimeter, True)
@@ -56,7 +71,7 @@ def preprocessImage( img):
         # If the contour detected has 4 vertices; likely to be our sign:
         if ( len( aprx) == 4) and cv2.contourArea( aprx) > float( 4000.0):
             sign = aprx
-            ## Find the extreme corners of the detected sign and store them for P.T.
+            ## Find the extreme-corners of the detected sign and store them for P.T.
             # Extreme left point
             points[0] = tuple( c[ c[ :,:,0].argmin()][0])
             # Extreme right point
@@ -71,6 +86,7 @@ def preprocessImage( img):
             ## Minus out the noise to black and show the sign
             res = cv2.bitwise_and( img, mask)
             
+            ## Perform the transformation method
             warp = tf.fourPtTrans( res, points)
         
     return warp
@@ -78,6 +94,10 @@ def preprocessImage( img):
 ### END-MASK DETECTION
 
 ### START-PREPROCESSING FOR COLOUR FUNCTION
+##      colourBalance(): This function was adapted from the forum post below
+##          It's aim is to balance the colours across the image so the image
+##          isn't too dark or too bright for the program to process 
+##
 
 def colourBalance( img):
     ## Function for colour balancing from:
@@ -98,18 +118,23 @@ def colourBalance( img):
     
     return ret_img
 
+##
+##      detectHSVColours(): This function is responsible for detecting the colours
+##          of the hazmat label signs. Just the basic pre-processing techniques were used here.
+##
+
 def detectHSVColours( img):
     
     ## Give the image a blur to filter out small noise
     blurred = cv2.GaussianBlur( img, (5,5), 3)
     
     ## Help the smoothing with a morphology erosion and dilation
-    closed = cv2.morphologyEx( img, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
+    opened = cv2.morphologyEx( img, cv2.MORPH_OPEN, np.ones( ( 5, 5), np.uint8))
     
     ## Use the HSV colourspace to classify colours
-    hsv_img = cv2.cvtColor( closed, cv2.COLOR_BGR2HSV)
+    hsv_img = cv2.cvtColor( opened, cv2.COLOR_BGR2HSV)
     
-    ## Select likely top and bottom of the image
+    ## Select likely top and bottom of the image manually: img[ y, x]
     colour1 = hsv_img[ 190, 395]
     colour2 = hsv_img[ 370, 190]
     
@@ -120,7 +145,7 @@ def detectHSVColours( img):
     actualBot = ''
     
     ## Colour HSV range thresholding to find the correct values to classify the data set based
-    ## on Simple Background Images
+    ## on Simple Background Images - these were handpicked HSV values to cater towards Set B
     
     ## Check for White
     if (colour1[0] >= 0 and colour1[0] <= 24) or (colour1[0] >= 70 and colour1[0] <= 120):
@@ -201,16 +226,20 @@ def detectHSVColours( img):
 ### END-PREPROCESSING FOR COLOUR FUNCTION
 
 ### START-DIVIDE IMAGE FUNCTION
+##      These two functions served the purpose of segmenting the image, to reduce
+##      the processing power and time by processing on a smaller scale, where 
+##      things we know are not useful are excluded.
+##
 
 def divideImage3( img_orig):
     ## Set the img width and height
     crop_0 = img_orig.copy()
     imgh, imgw = crop_0.shape[ :2]
     
-    ## Cut image in 5ths: image[y/2, x]
+    ## Calculate the segments into thirds:
     secHeight = int( m.floor( imgh // 3))
     
-    ## Create sections to begin cropping the image (for 5 row sections)
+    ## Create sections to begin cropping the image (for 3 row sections)
     crop_1 = crop_0[ secHeight:, :]
     crop_2 = crop_1[ secHeight:, :]
     
@@ -228,7 +257,7 @@ def divideImage5( img_orig):
     crop_0 = img_orig.copy()
     imgh, imgw = crop_0.shape[ :2]
     
-    ## Cut image in 5ths: image[y/2, x]
+    ## Calculate the segments into fifths:
     secHeight = int( m.floor( imgh // 5))
     
     ## Create sections to begin cropping the image (for 5 row sections)
@@ -250,31 +279,29 @@ def divideImage5( img_orig):
     
 ### END-DIVIDE IMAGE FUNCTION
 
-### START-CLASS CLASSIFICATION
+### START-OCR TEMPLATE CONTOUR
+##      This function is responsible for sorting the input template from
+##      left to right, and keeping the order. It assumes that the image
+##      passed in will be the template image and has been segmented and 
+##      concatenated for the purposes of this program; that each contour
+##      will be expected to be along one horizontal line in the image. I have
+##      manually generated these template images to be so.
+##
 
-def readClass( rows):
-    ## Combine the 4th and 5th rows for class classification
-    img = rows[2]#np.concatenate( (rows[3], rows[4]), axis=0)
-    img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
-    img = cv2.medianBlur( img, 9)
-    
-    ## Apply adaptive thresholding to get the class number:
-    img = cv2.adaptiveThreshold( img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 2)
-    
-    ## Find Contours on the OCR Template for Class:
-    templ_ref = cv2.imread( './Template/0to9ArialBlack.PNG', cv2.IMREAD_COLOR)
-    templ_ref = cv2.cvtColor( templ_ref, cv2.COLOR_BGR2GRAY)
+def findContourOCR( img):
+    ## Find Contours on the OCR Template for class numbers:
+    templ_ref = cv2.cvtColor( img.copy(), cv2.COLOR_BGR2GRAY)
     
     ## Threshold the template image
     templ_ref = cv2.threshold( templ_ref, 10, 255, cv2.THRESH_BINARY_INV)[ 1]
     ocr_cont = cv2.findContours( templ_ref.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     ocr_cont = ocr_cont[1]
     
-    ## Sort the OCR Template contours from left to right 
+    ## Sort the OCR Template contours from left to right using getContPrec
     ocr_cont.sort(key=lambda x:tf.getContPrec(x, templ_ref.shape[ 1]))
     
     ## Initialise a digits set which match digit to roi - {} dictionary assignment
-    digits = {}
+    char = {}
     
     ## Loop over the OCR Template
     for( i, c) in enumerate( ocr_cont):
@@ -284,46 +311,121 @@ def readClass( rows):
         roi = templ_ref[ y-5:y+h+5, x-5:x+w+5]
         roi = cv2.resize( roi, ( 57, 88))
         
-        digits[ i] = roi
-    ## Check digit template ordering    
-    ##cv2.imshow( 'digit template', digits[1])
-    
-    ## If needed; dilate erosion filters
-    # img = cv2.dilate( img, np.ones( ( 5, 5), np.uint8), iterations=1)
-    # img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=1)
-    
-    ## If image is more white than black, invet, else leave as is
-    num_white = np.sum( img == 255)
-    if num_white > 2500: 
-        img = cv2.bitwise_not(img)
-    
-    
+        char[ i] = roi
+        
+    return char
+
+### END-OCR TEMPLATE CONTOUR
+
+### START-OCR ACTUAL IMAGE CONTOUR
+##      This function performs a contour search on a given image
+##      It assumes pre-processing has been done and aims to find the 
+##      bounding boxes of characters
+##
+
+def findContourEachDigit( img):
     ## Find contours in the sectioned image
     img_cnts = cv2.findContours( img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     img_cnts = img_cnts[1]
     
     locs = []
-
+    
+    ## Find the bounding rectangles for the img
     for( i, c) in enumerate( img_cnts):
         ( x, y, w, h) = cv2.boundingRect( c)
         
         ## Check if contour pixel height is sensible for a number
         if( w > 10 and w < 80) and ( h > 30 and h < 100):
+            ## Also check the area is sensible (considering the size as well)
             if cv2.contourArea( c) > 200:
-                cv2.rectangle( img, ( x, y), ( x + w, y + h), ( 0, 255, 0), 2)
-                ## Append the region to locs
+                ## Draw the rectangle to the image and append the coordinates to locs[]
+                cv2.rectangle( img, ( x, y), ( x + w, y + h), ( 0, 255, 0), 1)
                 locs.append( ( x, y, w, h))
+                
     ## Sort the detected contours from left to right
     locs = sorted( locs, key=lambda x:x[0])
     
-    ## Output will show the extracted number
-    output = []
+    return locs
+
+##
+### END-OCR ACTUAL IMAGE CONTOUR
+
+### START-OCR ACTUAL IMAGE CONTOUR
+##      This function performs a contour search on a given image
+##      It assumes pre-processing has been done and aims to find the 
+##      bounding boxes of characters. It is the same function as above
+##      But with different parameters. Instead of parsing them in it was
+##      easier to test for me to hard code them in the function. Only
+##      testing on Set B so the thresholding is catered to that set.
+##
+
+def findContourEachChar( img):
+    ## Perform a small erosion to get rid of any noise left 
+    img = cv2.erode( img, np.ones( ( 3, 3), np.uint8), iterations=1)
     
+    ## Find the contours
+    img_cnts = cv2.findContours( img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    img_cnts = img_cnts[1]
+    
+    locs = []
+    
+    for( i, c) in enumerate( img_cnts):
+        ( x, y, w, h) = cv2.boundingRect( c)
+        
+        ## Check if contour pixel height is sensible for a character
+        if( w > 5 and w < 80) and ( h > 20 and h < 100):
+            ## If the area is also suitable:
+            if cv2.contourArea( c) > 90:
+                ## Draw the rectangle and append the region to locs[]
+                cv2.rectangle( img, ( x, y), ( x + w, y + h), ( 255, 255, 255), 1)
+                locs.append( ( x, y, w, h))
+                
+    ## Sort the detected contours from left to right
+    locs = sorted( locs, key=lambda x:x[0])
+    #cv2.imshow( 'contour full roi', img)
+    return locs
+
+##
+### END-OCR ACTUAL IMAGE CONTOUR
+
+### START-CLASS CLASSIFICATION
+
+def readClass( rows):
+    
+    ## Find the digits of the template
+    templateFile = cv2.imread( './Template/0to9ArialBlack.PNG', cv2.IMREAD_COLOR)
+    digits = findContourOCR( templateFile)
+    
+    ## Use the last row of the segmented image
+    img = rows[2]
+    img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
+    img = cv2.medianBlur( img, 9)
+    
+    ## Apply adaptive thresholding to get the class number:
+    img = cv2.adaptiveThreshold( img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 2)
+    
+    ## If needed; dilate erosion filters
+    # img = cv2.dilate( img, np.ones( ( 5, 5), np.uint8), iterations=1)
+    # img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=1)
+    
+    ## If image is more white than black, invert, else leave as is
+    num_white = np.sum( img == 255)
+    if num_white > 2500: 
+        img = cv2.bitwise_not(img)
+    
+    ## Find the contour of each character in the image
+    locs = findContourEachDigit( img)
+    
+    ## @output = will show the extracted number
+    ## @black = is the colour of the padding
+    ## @pad = value for border padding
+    output = []
+    black = [0, 0, 0]
+    pad = 20
     ## Loop over the existing potential numbers:
     for( i, ( lX, lY, lW, lH)) in enumerate( locs):
         
-        
-        ## Extract the digit from binary section image
+        ## Extract the digit from binary section image, zoom out a tiny bit
         roi = img[ lY - 5: lY + lH + 5, lX - 5: lX + lW + 5]
         
         ## Initialise a list of template matching scores
@@ -335,6 +437,9 @@ def readClass( rows):
             
             ## If the white area is too great, invert the image to score against template
             roi_white = np.sum( roi == 255)
+            
+            ## Pad the border to make template matching a bit easier
+            roi = cv2.copyMakeBorder( roi.copy(), pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=black)
             if roi_white > 2000:
                 roi = cv2.bitwise_not(roi)
             
@@ -362,191 +467,211 @@ def readClass( rows):
 ### START-CHARACTER CLASSIFICATION
 
 def findCharacters( rows):
-    ## Template
-    template = cv2.imread( './Template/AtoZFinal.PNG', cv2.IMREAD_COLOR)
+    ## Template file
+    templateFile = cv2.imread( './Template/AtoZFinal.PNG', cv2.IMREAD_COLOR)
+    ## Ensure a character map in the following order
+    charKey = [ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', \
+                'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'W', \
+                    'X', 'Y', 'Z']
     
-    ## Combine 2nd 3rd 4th rows for character classification
-    img = rows[1]#np.concatenate( ( rows[1], rows[2], rows[3]), axis=0)
-    ## Resize
-    img = cv2.resize( img, (500, 300))
-    ## Convert to gray scale and apply a threshold to prepare contour detection
+    ## Use the center third of the image for text detection
+    img = rows[1]
+    ## Convert to gray scale and apply pre-processing to prepare contour detection
     gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
-    gray_img = cv2.bilateralFilter( gray_img, 5, 75, 75) 
-    #thresh = cv2.adaptiveThreshold( gray_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
-                                   #cv2.THRESH_BINARY, 21, 1)
-    #thresh = cv2.medianBlur( gray_img, 7)
-    #ret, thresh = cv2.threshold( gray_img, 127, 255, cv2.THRESH_BINARY)
     
-    cv2.imshow( 'gray_img', gray_img)
+    ## Make a copy of the original with contours not drawn on
+    gray_ori = gray_img.copy()
     
-    ## Perform MSER to find character symbols
+    #cv2.imshow('row2',gray_ori)
+                               
+    ## Apply a Gaussian blur to the gray image to eliminate uninteresting stable regions
+    gray_img = cv2.GaussianBlur( gray_img, (5, 5), 0)
+    
+    ## Perform MSER to find character symbols (regions of interest)
     mser = cv2.MSER_create()
     regions, _ = mser.detectRegions( gray_img)
-    ## Display contours for testing:
+    
+    ## Find the contours using convexHull
     hulls = [ cv2.convexHull( p.reshape( -1, 1, 2)) for p in regions ]
     
+    ## Initialise mask for text area
     mask = np.zeros( gray_img.shape, np.uint8)
-    print( len( hulls))
+    
     for cnts in hulls:
         per = cv2.arcLength( cnts, True)
         aprx = cv2.approxPolyDP( cnts, 0.01 * per, True)
         
-        if cv2.contourArea( aprx) > 500.0 and cv2.contourArea( aprx) < 3200:
-            #cv2.polylines( thresh, cnts, 1, (0, 0, 255))
+        ## Eliminate contours that are too small or too large
+        if cv2.contourArea( aprx) > 250.0 and cv2.contourArea( aprx) < 3200:
             ( x, y, w, h) = cv2.boundingRect( cnts)
-            cv2.rectangle( mask, ( x, y), ( x+w, y+h), (255, 255, 255), -1)
-            
-    #mask = cv2.erode( mask, np.ones( ( 5, 5), np.uint8), iterations=1)
-    mask = cv2.dilate( mask, np.ones( ( 9, 9), np.uint8), iterations=2)
+            ## If not touching borders and roughly in the center:
+            if not (x == 1 or y == 1):
+                t1 = x + w
+                t2 = y + h
+                if not ( t1 == gray_img.shape[1]-1 or t2 == gray_img.shape[0]):
+                    if not y < gray_img.shape[0]-120:
+                        ## Set the mask
+                        cv2.rectangle( mask, ( x, y), ( x+w, y+h), (255, 255, 255), -1)
+    
+    ## Dilate the mask to find the text bounding box
+    mask = cv2.dilate( mask, np.ones( ( 5, 5), np.uint8), iterations=2)
     result = cv2.bitwise_and( gray_img, mask)
     
     #cv2.imshow( 'contours', result)
     
-    ## Mask needs to be appropriate, > 200px wide and < 100 px high
+    ## Initialise some fields:
+    ## @black = colour for padding
+    ## @pad = border padding
+    ## @textout = final text checking string
+    ## @resultText = the output to the user
+    ## @output[] = output list where all characters and words joined
+    black = [ 0, 0, 0]
+    pad = 20
+    textout = ''
+    resultText = 'text: '
+    output = []
+    
+    ## Mask needs to be appropriate for words
     m_cnt = cv2.findContours( mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     m_cnt = m_cnt[1]
     
-    ## Only find the bounding box where w > 200 and h < 100
+    ## Only find the bounding box it makes sense to detect the word
     for c in m_cnt:
         ( x, y, w, h) = cv2.boundingRect( c)
-        if w > 200 and h < 100:
-            #cv2.drawContours( gray_img, [c], -1, (255, 255, 255), 1)
+        if (w > 50 and h > 30 and h < 70 ) or (w > 150 and h > 70):
             cv2.rectangle( gray_img, ( x, y), ( x+w, y+h), (255, 255, 255), 1)
             
-    cv2.imshow( 'mask box', gray_img)
-
-### END-CHARACTER CLASSIFICATION
-
-### START-OCR
-
-def readSign( img):
-    
-    ## List of results:
-    results = []
-    text_colon = 'text: '
-    text_word = 'word: '
-    ## MSER
-    vis = img.copy()
-    mser = cv2.MSER_create()
-    
-    gray = cv2.cvtColor( img.copy(), cv2.COLOR_BGR2GRAY)
-    gray = cv2.dilate( gray, np.ones( ( 3, 3), np.uint8), iterations = 1)
-    
-    edges = cv2.Canny( gray, 10, 50)
-    
-    contours = cv2.findContours( edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnt = contours[1]
-    #showCont = cv2.drawContours( img, cnt, -1, (0, 255, 0), 1)
-    
-    regions, _ = mser.detectRegions( gray)
-    hulls = [ cv2.convexHull( p.reshape( -1, 1, 2)) for p in regions]
-    
-    ## Set up mask
-    mask = np.zeros( img.shape, np.uint8)
-    characters = []
-    
-    idx = 0
-    segm = './Segments/'
-    words = []
-    
-    ## Find the contours of region greater than 40, set a bounding box
-    for c in regions:
-        perimeter = cv2.arcLength( c, True)
-        aprx = cv2.approxPolyDP( c, 0.01 * perimeter, True)
-        
-        if cv2.contourArea( aprx) > 50.0 and cv2.contourArea( aprx) < 1000:
-            x, y, w, h = cv2.boundingRect( c)
-            cv2.rectangle( mask, ( x, y), ( x+w, y+h), ( 0, 255, 0), 1)
-            ## Store the coordinates into an object, use for tesseract:
-            characters.append( c)
+            ## ROI where we calculate them to be (from above)
+            text_roi = gray_ori[ y : y+h, x : x+w]
+            #cv2.imshow( 'text_roi', text_roi)
             
-    ## Loop over all the characters:
-    k1 = np.ones( ( 5, 5), np.uint8)
-    pad = 20 #px
-    color = [0, 0, 0]
-
-    """
-    for c in characters:
-        (x, y, w, h) = cv2.boundingRect( c)
-        x -= 1
-        y -= 1
-        w += 2
-        h += 2
+            ## Call function to detect the individual letters in the template stored in a dictionary
+            charas = {}
+            charas = findContourOCR( templateFile)
+            
+            ## Filter the text_roi
+            text_roi = cv2.medianBlur( text_roi, 3)
+            
+            ## Apply adaptive thresholding to get the characters segmented:
+            text_roi = cv2.adaptiveThreshold( text_roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 2)
+            
+            ## If needed; dilate erosion filters
+            #text_roi = cv2.dilate( text_roi, np.ones( ( 5, 5), np.uint8), iterations=1)
+            #text_roi = cv2.erode( text_roi, np.ones( ( 3, 3), np.uint8), iterations=1)
+            
+            ## If image is more white than black, invet, else leave as is
+            num_white = np.sum( text_roi == 255)
+            #print( num_white)
+            ## Check white pixel density to work with as many labels as possible
+            if num_white < 1500 or num_white > 1800 and num_white < 4200 or num_white > 5800 and num_white < 6000 or num_white > 12000: 
+                text_roi = cv2.bitwise_not(text_roi)
+            
+            ## Pad the borders to ensure all text are inside the contour
+            text_roi = cv2.copyMakeBorder( text_roi.copy(), pad/2, pad/2, pad/2, pad/2, cv2.BORDER_CONSTANT, value=black)
+            
+            ## Morphology and blurs to clear up the text 
+            text_roi = cv2.medianBlur( text_roi, 5)
+            text_roi = cv2.erode( text_roi, np.ones( ( 3, 3), np.uint8), iterations=1)
+            
+            text_roi = cv2.dilate( text_roi, np.ones( ( 5, 5), np.uint8), iterations=1)
+            #text_roi = cv2.erode( text_roi, np.ones( ( 5, 5), np.uint8), iterations=1)
+            #cv2.imshow( 'filtered text_roi', text_roi)
+            
+            ## Find contours of the text area and template match
+            locs = findContourEachChar( text_roi)
+            
+            ## Output will show the extracted number
+            groupOutput = []
+            
+            ## Loop over the existing potential numbers:
+            for( i, ( lX, lY, lW, lH)) in enumerate( locs):
+                
+                ## Extract the char from binary section image
+                roi = text_roi[ lY: lY + lH+1, lX: lX + lW+1]
+                
+                ## Ensure same calculated roi and actual roi - erosion above aswell
+                roi = cv2.erode( roi, np.ones( ( 3, 3), np.uint8), iterations=1)
+                #cv2.imshow( 'calculated roi', roi)
+                
+                ## Initialise a list of template matching scores
+                scores = []
+                
+                if roi.shape[0] and roi.shape[1] > 0:
+                    ## Ensure ROI is the same size as the template thresholding for scoring
+                    roi = cv2.resize( roi, ( 57, 88))
+                    ## Pad the ROI to help out the template matching
+                    roi = cv2.copyMakeBorder( roi.copy(), pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=black)
+                    ## If the white area is too great, invert the image to score against template
+                    
+                    roi_white = np.sum( roi == 255)
+                    if roi_white < 700:
+                        roi = cv2.bitwise_not(roi)
+                    #cv2.imshow( 'actual roi', roi)
+                    
+                    ## Loop over reference char and char ROI:
+                    for( char, charROI) in charas.items():
+                        ## Apply template matching and score on max value of match
+                        result = cv2.matchTemplate( roi, charROI, cv2.TM_CCOEFF)
+                        ( _, score, _, _) = cv2.minMaxLoc( result)
+                        scores.append( score)
+                        
+                    ## Scores should match with template contours -> already sorted     
+                    groupOutput.append( str( charKey[ np.argmax( scores)]))
+                    
+            ## Update the digits output list
+            output.extend( groupOutput)
+            if len( groupOutput) > 0:
+                ## Join up the characters
+                bufferText = ''.join( groupOutput)
+            
+    ## SPELL CHECK
+    if len( output) > 0:
+        corrected = ''
+        ## Join up any separated words/characters 
+        textout += ''.join( output)
         
-        roi = img[ y: y+h, x: x+w]
-        
-        roi_re = cv2.resize( roi, (150, 150))
-        
-        roi_re = cv2.copyMakeBorder( roi_re, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=color)
-        
-        gray_roi = cv2.cvtColor( roi_re.copy(), cv2.COLOR_BGR2GRAY)
-        
-        ret, bin_roi = cv2.threshold( gray_roi, 127, 255, cv2.THRESH_BINARY)
-        
-        bin_roi = cv2.bitwise_not( bin_roi)
-        #roi = cv2.threshold( gray_roi, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        bin_roi = cv2.dilate( bin_roi, k1, iterations=3)
-        
-        cv2.imwrite( (segm + str(idx) + '.png'), bin_roi)
-        
-        cv2.imshow( 'c', bin_roi)
-        idx += 1
-        
-        single_char = pt.image_to_string( bin_roi, lang='eng', boxes=False, config='--psm 10 --oem 3 -c \
-                                         tessedit_char_whitelist=ABCDEFGHIKLMNOPQRSTUVWXYZ')
-        words.append( single_char)
-    #    #cv2.drawContours( mask, [aprx], -1, ( 0, 255, 255), 1)
+        if 'ACT' in textout or 'TIV' in textout or 'RAD' in textout:
+            corrected = 'RADIOACTIVE'
+        if 'IXF' in textout or 'EXP' in textout or 'FLOS' in textout or 'PLDS' in textout or 'PLOS' in textout:
+            corrected = 'EXPLOSIVE'
+            if 'S' in textout[1:]: ##End of string
+                corrected = 'EXPLOSIVES'
+        if 'AST' in textout or 'LAST' in textout or ('AG' in textout):
+            corrected = 'BLASTING AGENT'
+            if 'S' in textout[1:] or 'G' in textout[1:]: ##End of string
+                corrected = 'BLASTING AGENTS'
+        if 'P' in textout[1:] and 'I' in textout or 'ROX' in textout or 'GAN' in textout:
+            corrected = 'ORGANIC PEROXIDE'
+        if ('DR' in textout or 'OR' in textout) and 'I' in textout:
+            corrected = 'ORGANIC PEROXIDE'
+        if 'INH' in textout or 'H' in textout and 'AZ' in textout:
+            if len(textout) > 7:
+                corrected = 'INHALAZTION HAZARD'
+        if 'T' in textout and 'X' in textout and len( textout) < 8:
+            corrected = 'TOXIC'
+        if 'X' in textout and 'GE' in textout:
+            corrected = 'OXYGEN'
+        if 'MMA' in textout or 'GMA' in textout or 'ABL'in textout and 'AS' in textout:
+            corrected = 'FLAMMABLE GAS'
+        if 'AMM' in textout and not 'G' in textout:
+            corrected = 'FLAMMABLE'
+        if 'DA' in textout and 'AN' in textout or 'DAN' in textout:
+            corrected = 'DANGEROUS WHEN WET'
+        if 'BUST' in textout:
+            corrected = 'COMBUSTIBLE'
+        if 'UE' in textout:
+            corrected = 'FUEL OIL'
+        if 'DXID' in textout or 'OXID' in textout:
+            if len( textout) < 9:
+                corrected = 'OXIDIZER'
+        if 'ISON' in textout or 'ISDN' in textout:
+            corrected = 'POISON'
+        if 'COR' in textout or 'CDR' in textout and 'IV' in textout:
+            corrected = 'CORROSIVE'
+        if 'GASOL' in textout or 'GASUL' in textout:
+            corrected = 'GASOLINE'
+        print( resultText + corrected)
+    else:
+        print( 'text: none')
     
-    print( words)
-    for ii in words:
-        ii = "".join( [ c if ord( c) < 128 else "" for c in ii]).strip()
-        text_word += ii
-    print( text_word)
-    cv2.imshow( 'mask', mask)"""
-    
-    #img_blur = cv2.GaussianBlur( img, ( 5, 5), 0)
-    
-    kernel = np.ones( ( 3, 3), np.uint8)
-    
-    img_rgb = cv2.cvtColor( img, cv2.COLOR_BGR2RGB)
-    img_gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
-    
-    img_gray = cv2.Canny( img_gray, 100, 200)
-    
-    #img_gray = cv2.dilate( img_gray, kernel, iterations=1)
-    
-    cv2.imshow( 'gray', img_gray)
-    inv = cv2.bitwise_not( img_gray)
-    cv2.imshow( 'inv', inv)
-    
-    #closed = cv2.morphologyEx( inv, cv2.MORPH_CLOSE, kernel)
-    """
-    new_img = np.zeros_like( img_gray)
-    for val in np.unique( img_gray)[ 1:]:
-        new_mask = np.uint8( img_gray == val)
-        output = cv2.connectedComponentsWithStats( new_mask, 4)[ 1:3]
-        labels = output[0]
-        stats = output[1]
-        
-        largest_label = 1 + np.argmax( stats[ 1:, cv2.CC_STAT_AREA])
-        new_img[ labels == largest_label] = val
-        print( labels)
-        
-    print( new_img)
-    cv2.imshow( 'connected', new_img)
-    """
-    
-    text = pt.image_to_string( inv, lang='eng', boxes=False, config='--psm 7 --oem 3 -c \
-                                         tessedit_char_whitelist=ABCDEFGHIKLMNOPQRSTUVWXYZ012345678')
-    
-    ## Append detected text to list
-    results.append(text) 
-    
-    ## Strip out non-ascii text
-    for text in results:
-        text = "".join( [ c if ord( c) < 128 else "" for c in text]).strip()
-        text_colon += text
-    print( text_colon)
-    #print( results)
-    
-### END-OCR
+### END-CHARACTER CLASSIFICATION

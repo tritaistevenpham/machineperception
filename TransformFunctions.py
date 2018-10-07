@@ -1,26 +1,12 @@
+""" COMP3007 - Machine Perception Assignment
+        Author: Tri Tai Steven Pham
+        Student ID: 17748229
+        Year: 2018
+"""
+
+## Import libraries
 import cv2
 import numpy as np
-
-### START-ORDER POINTS FUNCTION
-def orderPoints( points):
-    ## Initialise a set of 4 points in TL->TR->BR->BL ordering
-    rect = np.zeros( ( 4, 2), dtype = "float32")
-    
-    ## With this system, top left with have smallest sum of XY
-    ## and bottom right will have the largest sum of XY
-    
-    tot = points.sum( axis = 1)
-    rect[ 0] = points[ np.argmin( tot)]
-    rect[ 2] = points[ np.argmax( tot)]
-    
-    ## Top right will have the smallest difference between points
-    ## Bottom left will have the largest difference between points
-    diff = np.diff( points, axis = 1)
-    rect[ 1] = points[ np.argmin( diff)]
-    rect[ 3] = points[ np.argmax( diff)]
-    return rect;
-    
-### END-ORDER POINTS FUNCTION
 
 ### START-FOUR POINT TRANSFORM FUNCTION
 
