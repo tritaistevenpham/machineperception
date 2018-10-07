@@ -202,7 +202,28 @@ def detectHSVColours( img):
 
 ### START-DIVIDE IMAGE FUNCTION
 
-def divideImage( img_orig):
+def divideImage3( img_orig):
+    ## Set the img width and height
+    crop_0 = img_orig.copy()
+    imgh, imgw = crop_0.shape[ :2]
+    
+    ## Cut image in 5ths: image[y/2, x]
+    secHeight = int( m.floor( imgh // 3))
+    
+    ## Create sections to begin cropping the image (for 5 row sections)
+    crop_1 = crop_0[ secHeight:, :]
+    crop_2 = crop_1[ secHeight:, :]
+    
+    ## Create the sections and store them as new images for processing
+    sec1 = crop_0[ :secHeight, :]
+    sec2 = crop_1[ :secHeight, :]
+    sec3 = crop_2[ :secHeight, :]
+    
+    ## Store rows for grouped access
+    rows = [sec1, sec2, sec3]
+    return rows
+
+def divideImage5( img_orig):
     ## Set the img width and height
     crop_0 = img_orig.copy()
     imgh, imgw = crop_0.shape[ :2]
@@ -223,6 +244,7 @@ def divideImage( img_orig):
     sec4 = crop_3[ :secHeight, :]
     sec5 = crop_4[ :secHeight, :]
     
+    ## Store rows for grouped access
     rows = [sec1, sec2, sec3, sec4, sec5]
     return rows
     
@@ -232,27 +254,12 @@ def divideImage( img_orig):
 
 def readClass( rows):
     ## Combine the 4th and 5th rows for class classification
-    img = np.concatenate( (rows[3], rows[4]), axis=0)
-    
+    img = rows[2]#np.concatenate( (rows[3], rows[4]), axis=0)
     img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
-    
-   #img = cv2.GaussianBlur( img, (5,5), 0)
-    
-    #cv2.imshow( 'adap', img)
-    #img = cv2.morphologyEx( img, cv2.MORPH_CLOSE, np.ones( ( 5, 5), np.uint8))
     img = cv2.medianBlur( img, 9)
-    
-    
-    #ret, img = cv2.threshold( img, 127, 255, cv2.THRESH_BINARY)
-    
-    #img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=2)
-    #img = cv2.erode( img, np.ones( ( 3, 3), np.uint8), iterations=1)
-    #img = cv2.dilate( img, np.ones( ( 3, 3), np.uint8), iterations=1)
     
     ## Apply adaptive thresholding to get the class number:
     img = cv2.adaptiveThreshold( img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 2)
-    
-    cv2.imshow( 'close', img)
     
     ## Find Contours on the OCR Template for Class:
     templ_ref = cv2.imread( './Template/0to9ArialBlack.PNG', cv2.IMREAD_COLOR)
@@ -278,22 +285,20 @@ def readClass( rows):
         roi = cv2.resize( roi, ( 57, 88))
         
         digits[ i] = roi
-        
-    #cv2.imshow( 'digit template', digits[1])
+    ## Check digit template ordering    
+    ##cv2.imshow( 'digit template', digits[1])
     
+    ## If needed; dilate erosion filters
+    # img = cv2.dilate( img, np.ones( ( 5, 5), np.uint8), iterations=1)
+    # img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=1)
     
-    #img = cv2.dilate( img, np.ones( ( 5, 5), np.uint8), iterations=1)
-    #img = cv2.erode( img, np.ones( ( 5, 5), np.uint8), iterations=1)
     ## If image is more white than black, invet, else leave as is
     num_white = np.sum( img == 255)
     if num_white > 2500: 
         img = cv2.bitwise_not(img)
     
     
-    cv2.imshow( 'img after bitwise', img)
-    
     ## Find contours in the sectioned image
-    #cv2.imshow( 'imgnot', img_not)
     img_cnts = cv2.findContours( img.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     img_cnts = img_cnts[1]
     
@@ -319,26 +324,23 @@ def readClass( rows):
         
         
         ## Extract the digit from binary section image
-        dig = img[ lY - 5: lY + lH + 5, lX - 5: lX + lW + 5]
-        ## Threshold to segment the digit from background
-        #dig = cv2.threshold( dig, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[ 1]
-        #cv2.imshow( 'dig', dig)
+        roi = img[ lY - 5: lY + lH + 5, lX - 5: lX + lW + 5]
+        
         ## Initialise a list of template matching scores
         scores = []
-        #for c in digitCont:
-        roi = dig
+        
         if roi.shape[0] and roi.shape[1] > 0:
+            ## Ensure ROI is the same size as the template thresholding for scoring
             roi = cv2.resize( roi, ( 57, 88))
             
+            ## If the white area is too great, invert the image to score against template
             roi_white = np.sum( roi == 255)
             if roi_white > 2000:
                 roi = cv2.bitwise_not(roi)
-            cv2.imshow( 'roi', roi)
-            #cv2.imshow( 'dig', dig)
             
             ## Loop over reference digit and digit ROI:
             for( digit, digitROI) in digits.items():
-                ## Apply template matching and score
+                ## Apply template matching and score on max value of match
                 result = cv2.matchTemplate( roi, digitROI, cv2.TM_CCOEFF)
                 ( _, score, _, _) = cv2.minMaxLoc( result)
                 scores.append( score)
@@ -346,14 +348,74 @@ def readClass( rows):
             ## Scores should match with template contours -> already sorted     
             output.append( str( np.argmax( scores)))
             
-    ## Update the digits list
-    if len( output) > 0:
+    ## Update the digits output list
+    if len( output) > 0 and len( output) < 3:
+        ## If the output has 2 digits found, assume a decimal
         print( 'class: {}'.format( '.'.join( output)))
     else:
+        ## Any less: none found. Any more: classification error; output none
         print( 'class: none')
     #cv2.imshow( 'class', img)
 
 ### END-CLASS CLASSIFICATION
+
+### START-CHARACTER CLASSIFICATION
+
+def findCharacters( rows):
+    ## Template
+    template = cv2.imread( './Template/AtoZFinal.PNG', cv2.IMREAD_COLOR)
+    
+    ## Combine 2nd 3rd 4th rows for character classification
+    img = rows[1]#np.concatenate( ( rows[1], rows[2], rows[3]), axis=0)
+    ## Resize
+    img = cv2.resize( img, (500, 300))
+    ## Convert to gray scale and apply a threshold to prepare contour detection
+    gray_img = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY)
+    gray_img = cv2.bilateralFilter( gray_img, 5, 75, 75) 
+    #thresh = cv2.adaptiveThreshold( gray_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
+                                   #cv2.THRESH_BINARY, 21, 1)
+    #thresh = cv2.medianBlur( gray_img, 7)
+    #ret, thresh = cv2.threshold( gray_img, 127, 255, cv2.THRESH_BINARY)
+    
+    cv2.imshow( 'gray_img', gray_img)
+    
+    ## Perform MSER to find character symbols
+    mser = cv2.MSER_create()
+    regions, _ = mser.detectRegions( gray_img)
+    ## Display contours for testing:
+    hulls = [ cv2.convexHull( p.reshape( -1, 1, 2)) for p in regions ]
+    
+    mask = np.zeros( gray_img.shape, np.uint8)
+    print( len( hulls))
+    for cnts in hulls:
+        per = cv2.arcLength( cnts, True)
+        aprx = cv2.approxPolyDP( cnts, 0.01 * per, True)
+        
+        if cv2.contourArea( aprx) > 500.0 and cv2.contourArea( aprx) < 3200:
+            #cv2.polylines( thresh, cnts, 1, (0, 0, 255))
+            ( x, y, w, h) = cv2.boundingRect( cnts)
+            cv2.rectangle( mask, ( x, y), ( x+w, y+h), (255, 255, 255), -1)
+            
+    #mask = cv2.erode( mask, np.ones( ( 5, 5), np.uint8), iterations=1)
+    mask = cv2.dilate( mask, np.ones( ( 9, 9), np.uint8), iterations=2)
+    result = cv2.bitwise_and( gray_img, mask)
+    
+    #cv2.imshow( 'contours', result)
+    
+    ## Mask needs to be appropriate, > 200px wide and < 100 px high
+    m_cnt = cv2.findContours( mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    m_cnt = m_cnt[1]
+    
+    ## Only find the bounding box where w > 200 and h < 100
+    for c in m_cnt:
+        ( x, y, w, h) = cv2.boundingRect( c)
+        if w > 200 and h < 100:
+            #cv2.drawContours( gray_img, [c], -1, (255, 255, 255), 1)
+            cv2.rectangle( gray_img, ( x, y), ( x+w, y+h), (255, 255, 255), 1)
+            
+    cv2.imshow( 'mask box', gray_img)
+
+### END-CHARACTER CLASSIFICATION
 
 ### START-OCR
 

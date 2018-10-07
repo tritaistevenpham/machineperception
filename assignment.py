@@ -63,8 +63,9 @@ if option == 1: ## 4 + shadow P1380524.JPG | 2 P1380513.JPG | 1 P1380502.JPG | B
     pp.detectHSVColours( cb)
     
     ## Prepare the image subdivisions for character and symbol processing
-    rows = pp.divideImage( mask)
+    rows = pp.divideImage3( mask)
     pp.readClass( rows)
+    pp.findCharacters( rows)
     
     #pp.readSign( mask)
     
@@ -109,7 +110,7 @@ elif option == 2:
             pp.detectHSVColours( cb)
             #pp.readSign( mask)
             ## Prepare the image subdivisions for character and symbol processing
-            rows = pp.divideImage( mask)
+            rows = pp.divideImage3( mask)
             pp.readClass( rows)
             ## Change contour output location & image type here
             #print( outputImages + contourB + str(idx) + jpg)
